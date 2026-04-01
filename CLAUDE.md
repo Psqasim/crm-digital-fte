@@ -208,3 +208,126 @@ Wait for consent; never auto-create ADRs. Group related decisions (stacks, authe
 
 ## Code Standards
 See `.specify/memory/constitution.md` for code quality, testing, performance, security, and architecture principles.
+
+---
+
+# CRM Digital FTE Factory — Project Configuration
+## GIAIC Hackathon 5
+
+---
+
+## Project Overview
+**CRM Digital FTE Factory** is a production-grade AI Customer Success agent for **NexaFlow** — a B2B SaaS workflow automation platform. The agent handles support tickets from three channels: Gmail (email), WhatsApp (Twilio), and a Next.js Web Support Form.
+
+The system processes ~800 tickets/week, targets 75% AI resolution rate without human escalation, and routes complex cases to human agents via defined escalation rules.
+
+---
+
+## Company Context: NexaFlow
+- **Type:** B2B SaaS — workflow automation platform
+- **Customers:** 3,000 active accounts (SMB to mid-market)
+- **Plans:** Starter (free), Growth ($49/mo), Enterprise ($199/mo)
+- **Markets:** US, UK, Pakistan, India
+- **Support hours:** AI: 24/7 | Human: Mon–Fri 9am–6pm PKT
+
+Context files: `context/company-profile.md`, `context/product-docs.md`, `context/brand-voice.md`, `context/escalation-rules.md`
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Agent Runtime | Python 3.12 + OpenAI Agents SDK |
+| API Server | FastAPI |
+| Database | Neon PostgreSQL + pgvector |
+| Message Queue | Apache Kafka |
+| Frontend (Web Form) | Next.js 15 (App Router) |
+| Email Channel | Gmail API (OAuth 2.0) |
+| WhatsApp Channel | Twilio WhatsApp API |
+| Containerization | Docker |
+| Orchestration | Kubernetes (Minikube local, Oracle Cloud VM production) |
+
+---
+
+## Path Configuration
+
+- **WSL working path:** `/home/ps_qasim/projects/crm-digital-fte`
+- **GitHub:** `https://github.com/Psqasim/crm-digital-fte`
+
+> **CRITICAL:** Never work on `/mnt/d/` or `/mnt/c/` paths. Always operate from `/home/ps_qasim/projects/`. Windows paths are for reading legacy files only.
+
+---
+
+## CRITICAL: Datetime Injection Rule
+
+**ALWAYS** inject the current datetime into any agent system prompt using:
+
+```python
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+current_dt = datetime.now(ZoneInfo("Asia/Karachi"))
+system_prompt = f"""
+You are NexaFlow's AI support agent.
+Current date and time: {current_dt.strftime("%A, %B %d, %Y at %I:%M %p PKT")}
+...
+"""
+```
+
+**Never let the LLM guess or infer the current date.** This is required for:
+- Correct SLA breach detection (e.g., Enterprise 4-hour window)
+- Accurate timestamp references in responses
+- Proper scheduling and reminder context
+
+---
+
+## MCP Servers Available
+
+| MCP Server | Purpose |
+|-----------|---------|
+| Context7 | Library documentation lookup (OpenAI SDK, FastAPI, Kafka, pgvector, etc.) |
+| GitHub MCP | All git operations — commits, branches, PRs, issues |
+
+Use Context7 when you need current API documentation for any library in the stack.
+Use GitHub MCP for all version control operations.
+
+---
+
+## Spec-Kit Plus Commands
+
+| Command | Purpose |
+|---------|---------|
+| `uvx specifyplus init` | Initialize project |
+| `/sp.constitution` | Establish project principles |
+| `/sp.specify` | Create baseline specification |
+| `/sp.plan` | Create implementation plan |
+| `/sp.tasks` | Generate actionable tasks |
+| `/sp.implement` | Execute implementation |
+
+---
+
+## Phases
+
+| Phase | Name | Status |
+|-------|------|--------|
+| 0 | Scaffold | Done |
+| 1 | Constitution | `/sp.constitution` |
+| 2 | Specification | `/sp.specify` |
+| 3 | Planning | `/sp.plan` |
+| 4 | Tasks | `/sp.tasks` |
+| 5 | Implementation | `/sp.implement` |
+
+---
+
+## Environment Variables (never commit)
+```
+OPENAI_API_KEY=
+NEON_DATABASE_URL=
+KAFKA_BOOTSTRAP_SERVERS=
+GMAIL_CLIENT_ID=
+GMAIL_CLIENT_SECRET=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_WHATSAPP_NUMBER=
+```

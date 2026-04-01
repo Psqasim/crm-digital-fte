@@ -1,0 +1,6 @@
+# MCP Server Dependencies
+mcp>=1.0.0
+
+# Optional but recommended for development
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
