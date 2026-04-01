@@ -1,0 +1,107 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TicketMessage",
+  "description": "Raw inbound customer message from any channel (email, whatsapp, web_form)",
+  "type": "object",
+  "required": ["id", "channel", "customer_name", "message", "received_at"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique ticket identifier, e.g. TKT-001 or UUID",
+      "examples": ["TKT-025", "550e8400-e29b-41d4-a716-446655440000"]
+    },
+    "channel": {
+      "type": "string",
+      "enum": ["email", "whatsapp", "web_form"],
+      "description": "Source channel — determines normalization, formatting, and response style"
+    },
+    "customer_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Customer's full display name"
+    },
+    "customer_email": {
+      "type": ["string", "null"],
+      "format": "email",
+      "description": "Primary customer identifier. Required for email and web_form. May be null on first WhatsApp contact (phone-only)."
+    },
+    "customer_phone": {
+      "type": ["string", "null"],
+      "pattern": "^\\+[1-9]\\d{7,14}$",
+      "description": "E.164 phone number. Required for whatsapp channel. Null for email/web_form.",
+      "examples": ["+923001234567", "+447911123456"]
+    },
+    "subject": {
+      "type": ["string", "null"],
+      "description": "Message subject. Present for email and web_form. Null for whatsapp (inferred from message body)."
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Raw message body. Never empty. Gibberish is valid; emptiness is not."
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC ISO-8601 timestamp of when the message was received",
+      "examples": ["2026-03-15T08:23:11Z"]
+    },
+    "category": {
+      "type": ["string", "null"],
+      "enum": ["general", "technical", "billing", "bug_report", "feedback", null],
+      "description": "Pre-selected category from web form. Null for email and whatsapp."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Channel-specific metadata preserved for audit trail. Never null.",
+      "properties": {
+        "thread_id": {
+          "type": ["string", "null"],
+          "description": "Gmail thread ID for email channel"
+        },
+        "channel_message_id": {
+          "type": ["string", "null"],
+          "description": "External message ID: Gmail message ID, Twilio MessageSid, etc."
+        },
+        "wa_id": {
+          "type": ["string", "null"],
+          "description": "WhatsApp contact ID (Twilio WaId)"
+        },
+        "priority": {
+          "type": ["string", "null"],
+          "enum": ["low", "medium", "high", null],
+          "description": "Priority pre-selected on web form. Null for other channels."
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "oneOf": [
+    {
+      "description": "Email channel: email required, phone null",
+      "properties": {
+        "channel": {"const": "email"},
+        "customer_email": {"type": "string"},
+        "customer_phone": {"type": "null"}
+      },
+      "required": ["customer_email"]
+    },
+    {
+      "description": "WhatsApp channel: phone required, email optional",
+      "properties": {
+        "channel": {"const": "whatsapp"},
+        "customer_phone": {"type": "string"}
+      },
+      "required": ["customer_phone"]
+    },
+    {
+      "description": "Web form channel: email required, phone null",
+      "properties": {
+        "channel": {"const": "web_form"},
+        "customer_email": {"type": "string"},
+        "customer_phone": {"type": "null"}
+      },
+      "required": ["customer_email"]
+    }
+  ]
+}

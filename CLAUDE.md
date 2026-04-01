@@ -331,3 +331,6 @@ TWILIO_ACCOUNT_SID=
 TWILIO_AUTH_TOKEN=
 TWILIO_WHATSAPP_NUMBER=
 ```
+
+## Recent Changes
+- 001-incubation-exploration (Phase 2B): Added `openai>=1.0`, `python-dotenv` to requirements.txt. New modules: `src/agent/models.py` (dataclasses), `src/agent/knowledge_base.py` (Jaccard text search), `src/agent/channel_formatter.py` (email/whatsapp/web_form formatting), `src/agent/escalation_evaluator.py` (LLM-intent via gpt-4o-mini), `src/agent/prompts.py` (PKT datetime injection), `src/agent/prototype.py` (core loop + CLI). No new external services — OpenAI only. Prototype uses in-memory state; pgvector and Kafka deferred to Stage 2.
