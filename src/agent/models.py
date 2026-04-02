@@ -57,6 +57,26 @@ class EscalationDecision:
     raw_llm_response: str
 
 
+class TicketStatus(str, Enum):
+    OPEN = "open"
+    PENDING = "pending"
+    ESCALATED = "escalated"
+    RESOLVED = "resolved"
+
+
+class SentimentLabel(str, Enum):
+    IMPROVING = "improving"
+    STABLE = "stable"
+    DETERIORATING = "deteriorating"
+
+
+@dataclass
+class SentimentTrend:
+    label: SentimentLabel
+    window_scores: list[float]
+    window_size: int = 3
+
+
 @dataclass
 class AgentResponse:
     ticket_id: str

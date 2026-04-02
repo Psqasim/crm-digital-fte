@@ -169,7 +169,8 @@ description: "Task list for Phase 2C — Agent Memory & State"
 - [ ] T040 [P] Write `test_sentiment_score_proxy_all_urgency_levels` in `tests/unit/test_conversation_store.py` — verify all four keys in `URGENCY_SCORE_MAP` produce correct float values: `("high", True)→0.05`, `("normal", True)→0.25`, `("low", True)→0.45`, `(None, False)→0.80`
 - [ ] T041 Run full regression suite and verify all 41 unit tests + all 16 Phase 2B tests pass: `pytest tests/unit/test_conversation_store.py tests/test_core_loop.py tests/test_escalation_evaluator.py tests/test_prototype.py -v` — record PASS count in this file's Phase 8 checkpoint comment
 
-**Final Checkpoint**: 41 new unit tests pass + 16 Phase 2B regression tests pass. Zero cross-customer data leakage. All `process_ticket` call signatures unchanged.
+**Final Checkpoint**: 52 total tests pass (31 unit + 5 cross-channel + 16 Phase 2B regression). Zero cross-customer data leakage. All `process_ticket` call signatures unchanged.
+<!-- PASS COUNT: 52 passed (2026-04-02) — pytest tests/unit/test_conversation_store.py tests/test_cross_channel.py tests/test_core_loop.py tests/test_escalation_evaluator.py tests/test_prototype.py -->
 
 ---
 
