@@ -21,7 +21,7 @@
 
 **Purpose**: Declare dependencies, ensure import paths exist, configure `.env` handling.
 
-- [ ] T001 Add `openai>=1.0`, `python-dotenv` to `requirements.txt`; create `src/__init__.py` and `src/agent/__init__.py`; add `OPENAI_API_KEY=sk-your-key-here` to `.env.example`
+- [x] T001 Add `openai>=1.0`, `python-dotenv` to `requirements.txt`; create `src/__init__.py` and `src/agent/__init__.py`; add `OPENAI_API_KEY=sk-your-key-here` to `.env.example`
 
 **Acceptance**: `python -c "import openai, dotenv; print('OK')"` passes after `pip install -r requirements.txt`. Both `__init__.py` files exist and are empty.
 
@@ -35,8 +35,8 @@
 
 ⚠️ **CRITICAL**: No Phase 3–5 tasks can begin until this phase is complete.
 
-- [ ] T002 Create all six typed dataclasses in `src/agent/models.py`: `Channel` (str Enum), `TicketMessage`, `NormalizedTicket`, `KBResult`, `EscalationDecision`, `AgentResponse` — exact field definitions from `specs/001-incubation-exploration/data-model.md`
-- [ ] T003 [P] Create `src/agent/prompts.py` with `get_system_prompt(channel: str, customer_name: str) -> str` that injects `datetime.now(ZoneInfo("Asia/Karachi"))` — no hardcoded dates, no `datetime.utcnow()`
+- [x] T002 Create all six typed dataclasses in `src/agent/models.py`: `Channel` (str Enum), `TicketMessage`, `NormalizedTicket`, `KBResult`, `EscalationDecision`, `AgentResponse` — exact field definitions from `specs/001-incubation-exploration/data-model.md`
+- [x] T003 [P] Create `src/agent/prompts.py` with `get_system_prompt(channel: str, customer_name: str) -> str` that injects `datetime.now(ZoneInfo("Asia/Karachi"))` — no hardcoded dates, no `datetime.utcnow()`
 
 **Acceptance (T002)**: All six classes importable; `repr()` works on a hand-constructed instance of each; zero external dependencies (stdlib only + `from __future__ import annotations`).
 
@@ -52,9 +52,9 @@
 
 **Independent Test**: Process TKT-002 (email) — response starts with "Dear James," and ends with the NexaFlow signature. Process TKT-025 (WhatsApp) — response starts with "Hi Marcus! 👋" and is ≤ 1600 chars.
 
-- [ ] T004 [US1] Add `normalize_message(msg: TicketMessage) -> NormalizedTicket` to `src/agent/prototype.py` — implement all three channel branches (email, whatsapp, web_form) per `data-model.md` normalization rules including language detection
-- [ ] T005 [P] [US1] Create `src/agent/knowledge_base.py` with `KnowledgeBase` class: load `context/product-docs.md`, split by `##` headers, score by Jaccard word-overlap, return top-3 `KBResult` objects sorted by `relevance_score` descending
-- [ ] T006 [P] [US1] Create `src/agent/channel_formatter.py` with `format_response(raw: str, channel: Channel, name: str) -> str` — implement email (≤2500 chars, "Dear [Name],", NexaFlow signature), WhatsApp (≤1600 hard / 300 soft, "Hi [Name]! 👋", truncate + "…"), web_form ("Hi [Name],", ≤5000 chars) per `plan.md` T5 rules
+- [x] T004 [US1] Add `normalize_message(msg: TicketMessage) -> NormalizedTicket` to `src/agent/prototype.py` — implement all three channel branches (email, whatsapp, web_form) per `data-model.md` normalization rules including language detection
+- [x] T005 [P] [US1] Create `src/agent/knowledge_base.py` with `KnowledgeBase` class: load `context/product-docs.md`, split by `##` headers, score by Jaccard word-overlap, return top-3 `KBResult` objects sorted by `relevance_score` descending
+- [x] T006 [P] [US1] Create `src/agent/channel_formatter.py` with `format_response(raw: str, channel: Channel, name: str) -> str` — implement email (≤2500 chars, "Dear [Name],", NexaFlow signature), WhatsApp (≤1600 hard / 300 soft, "Hi [Name]! 👋", truncate + "…"), web_form ("Hi [Name],", ≤5000 chars) per `plan.md` T5 rules
 
 **Acceptance (T004)**:
 - WhatsApp ticket with `subject=None` → `inferred_topic` = first 10 words of message; `identifier_type="phone"` when email is null
@@ -83,15 +83,15 @@
 
 ### ⚠️ HIGH RISK — Test Stubs First
 
-- [ ] T007 [P] [US3] Write test stub `tests/test_escalation_evaluator.py` with three failing assertions: (1) TKT-006 input → `should_escalate=True` and reason mentions sentiment or human-request, (2) TKT-003 input → `should_escalate=False`, (3) TKT-044 input → `should_escalate=True` and reason mentions legal/compliance; also assert `json.loads(result.raw_llm_response)` succeeds — stubs must FAIL before T008
+- [x] T007 [P] [US3] Write test stub `tests/test_escalation_evaluator.py` with three failing assertions: (1) TKT-006 input → `should_escalate=True` and reason mentions sentiment or human-request, (2) TKT-003 input → `should_escalate=False`, (3) TKT-044 input → `should_escalate=True` and reason mentions legal/compliance; also assert `json.loads(result.raw_llm_response)` succeeds — stubs must FAIL before T008
 
-- [ ] T009 [P] [US3] Write test stub `tests/test_core_loop.py` with four failing assertions: (1) `process_ticket(tkt_002_email)` returns `AgentResponse` without exception, (2) escalation is evaluated before `generate_response` (verify via `escalation` field always populated), (3) TKT-006 → `should_escalate=True` (short-circuit, no LLM response generated), (4) TKT-025 → `formatted_response` length ≤ 1600 chars — stubs must FAIL before T010
+- [x] T009 [P] [US3] Write test stub `tests/test_core_loop.py` with four failing assertions: (1) `process_ticket(tkt_002_email)` returns `AgentResponse` without exception, (2) escalation is evaluated before `generate_response` (verify via `escalation` field always populated), (3) TKT-006 → `should_escalate=True` (short-circuit, no LLM response generated), (4) TKT-025 → `formatted_response` length ≤ 1600 chars — stubs must FAIL before T010
 
 ### Implementation (write AFTER test stubs are confirmed failing)
 
-- [ ] T008 [US3] ⚠️ HIGH RISK — Create `src/agent/escalation_evaluator.py` with `evaluate_escalation(message: str) -> EscalationDecision`: call `gpt-4o-mini` with structured JSON system prompt describing the 8 escalation triggers from constitution §V (sentiment < 0.3, refund, legal/GDPR, pricing negotiation, 3+ follow-ups, explicit human request, data breach, Enterprise SLA breach) — NO keyword lists, describe intent conceptually; parse JSON response into `EscalationDecision`; store raw LLM JSON in `raw_llm_response`
+- [x] T008 [US3] ⚠️ HIGH RISK — Create `src/agent/escalation_evaluator.py` with `evaluate_escalation(message: str) -> EscalationDecision`: call `gpt-4o-mini` with structured JSON system prompt describing the 8 escalation triggers from constitution §V (sentiment < 0.3, refund, legal/GDPR, pricing negotiation, 3+ follow-ups, explicit human request, data breach, Enterprise SLA breach) — NO keyword lists, describe intent conceptually; parse JSON response into `EscalationDecision`; store raw LLM JSON in `raw_llm_response`
 
-- [ ] T010 [US3] ⚠️ HIGH RISK — Complete `src/agent/prototype.py` `process_ticket(msg: TicketMessage) -> AgentResponse` following the strict 6-step flow from `plan.md` T8: (1) `create_ticket` → in-memory ticket_id + `normalize_message`, (2) empty customer history, (3) `search_knowledge_base`, (4) `evaluate_escalation`, (5) IF escalated → return escalation acknowledgment template without calling OpenAI main, (6) ELSE → `generate_response` via `gpt-4o` + `format_response` → return `AgentResponse` with all fields populated including `processing_time_ms` and `prompt_datetime`
+- [x] T010 [US3] ⚠️ HIGH RISK — Complete `src/agent/prototype.py` `process_ticket(msg: TicketMessage) -> AgentResponse` following the strict 6-step flow from `plan.md` T8: (1) `create_ticket` → in-memory ticket_id + `normalize_message`, (2) empty customer history, (3) `search_knowledge_base`, (4) `evaluate_escalation`, (5) IF escalated → return escalation acknowledgment template without calling OpenAI main, (6) ELSE → `generate_response` via `gpt-4o` + `format_response` → return `AgentResponse` with all fields populated including `processing_time_ms` and `prompt_datetime`
 
 **Acceptance (T008)**:
 - TKT-006 text → `should_escalate=True`; reason mentions sentiment/human-request
@@ -116,7 +116,7 @@
 
 **Independent Test**: `python src/agent/prototype.py` runs all 5 test tickets without exception. TKT-006 and TKT-044 print `Escalated: True`. TKT-025 prints `Response length: ≤ 1600 chars`.
 
-- [ ] T011 [US4] Add `if __name__ == "__main__":` block to `src/agent/prototype.py` and write `tests/test_prototype.py` loading test fixtures from `context/sample-tickets.json` for TKT-002 (email, neutral), TKT-006 (email, furious + human request), TKT-025 (WhatsApp, short), TKT-032 (WhatsApp, gibberish), TKT-044 (web_form, GDPR); assert all 5 produce `AgentResponse`; assert TKT-006 and TKT-044 `should_escalate=True`; assert TKT-025 `len(formatted_response) <= 1600`; assert TKT-002 and TKT-025 `should_escalate=False`
+- [x] T011 [US4] Add `if __name__ == "__main__":` block to `src/agent/prototype.py` and write `tests/test_prototype.py` loading test fixtures from `context/sample-tickets.json` for TKT-002 (email, neutral), TKT-006 (email, furious + human request), TKT-025 (WhatsApp, short), TKT-032 (WhatsApp, gibberish), TKT-044 (web_form, GDPR); assert all 5 produce `AgentResponse`; assert TKT-006 and TKT-044 `should_escalate=True`; assert TKT-025 `len(formatted_response) <= 1600`; assert TKT-002 and TKT-025 `should_escalate=False`
 
 **Acceptance (T011)**:
 - All 5 tickets produce `AgentResponse` without raising exceptions
@@ -131,7 +131,7 @@
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T012 [P] Validate `quickstart.md` end-to-end: run all 5 steps from `specs/001-incubation-exploration/quickstart.md`; confirm output matches expected format; update quickstart if any step diverges from actual implementation
+- [x] T012 [P] Validate `quickstart.md` end-to-end: run all 5 steps from `specs/001-incubation-exploration/quickstart.md`; confirm output matches expected format; update quickstart if any step diverges from actual implementation
 
 ---
 
