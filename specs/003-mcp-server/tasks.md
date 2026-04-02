@@ -32,9 +32,9 @@ Patterns confirmed from `specs/003-mcp-server/research.md` (source: modelcontext
 
 **Purpose**: Add the `mcp` dependency and create package skeletons so all imports resolve.
 
-- [ ] T001 Add `mcp>=1.2.0` to `requirements.txt` and verify `pip install -r requirements.txt` succeeds without conflict
-- [ ] T002 [P] Create `src/mcp_server/__init__.py` as an empty package marker file
-- [ ] T003 [P] Create `tests/unit/mcp_server/__init__.py` as an empty package marker file
+- [X] T001 Add `mcp>=1.2.0` to `requirements.txt` and verify `pip install -r requirements.txt` succeeds without conflict
+- [X] T002 [P] Create `src/mcp_server/__init__.py` as an empty package marker file
+- [X] T003 [P] Create `tests/unit/mcp_server/__init__.py` as an empty package marker file
 
 **Acceptance Criteria**:
 - `requirements.txt` contains `mcp>=1.2.0` line
@@ -53,9 +53,9 @@ No tool logic yet — only scaffold, imports, logging setup, `_ticket_index`, an
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T004 Create `src/mcp_server/server.py` with FastMCP scaffold — imports (`json`, `sys`, `uuid`, `logging`, `datetime`, `FastMCP`, `KnowledgeBase`, `get_store`, `TicketStatus`, `Channel`), `_kb = KnowledgeBase()`, `store = get_store()`, `_ticket_index: dict[str, str] = {}`, `mcp = FastMCP("nexaflow-crm")`, `logging.basicConfig(level=logging.INFO, stream=sys.stderr)`, `def main(): mcp.run(transport="stdio")`, `if __name__ == "__main__": main()` — NO tool implementations yet ⚠️ **HIGH RISK** (stdout must stay clean; any `print()` corrupts JSON-RPC)
+- [X] T004 Create `src/mcp_server/server.py` with FastMCP scaffold — imports (`json`, `sys`, `uuid`, `logging`, `datetime`, `FastMCP`, `KnowledgeBase`, `get_store`, `TicketStatus`, `Channel`), `_kb = KnowledgeBase()`, `store = get_store()`, `_ticket_index: dict[str, str] = {}`, `mcp = FastMCP("nexaflow-crm")`, `logging.basicConfig(level=logging.INFO, stream=sys.stderr)`, `def main(): mcp.run(transport="stdio")`, `if __name__ == "__main__": main()` — NO tool implementations yet ⚠️ **HIGH RISK** (stdout must stay clean; any `print()` corrupts JSON-RPC)
 
-- [ ] T005 Create `tests/unit/mcp_server/test_tools.py` with: import of `asyncio`, `json`, `pytest`; import all 7 tool function names from `src.mcp_server.server`; `@pytest.fixture(autouse=True)` that calls `reset_store()` from `src.agent.conversation_store`; one smoke-import test `test_server_imports_without_error` that asserts all 7 names are callable
+- [X] T005 Create `tests/unit/mcp_server/test_tools.py` with: import of `asyncio`, `json`, `pytest`; import all 7 tool function names from `src.mcp_server.server`; `@pytest.fixture(autouse=True)` that calls `reset_store()` from `src.agent.conversation_store`; one smoke-import test `test_server_imports_without_error` that asserts all 7 names are callable
 
 **Acceptance Criteria**:
 - `python -m src.mcp_server.server` starts without error (Ctrl+C to exit)
@@ -77,14 +77,14 @@ No tool logic yet — only scaffold, imports, logging setup, `_ticket_index`, an
 
 > **Write these tests FIRST — they must FAIL before T007 is implemented.**
 
-- [ ] T006 [US1] Add 3 test functions to `tests/unit/mcp_server/test_tools.py`:
+- [X] T006 [US1] Add 3 test functions to `tests/unit/mcp_server/test_tools.py`:
   `test_search_returns_ranked_results` (valid query → `results` list non-empty, each item has `section_title`, `content`, `relevance_score`),
   `test_search_no_match_returns_empty` (nonsense query → `{"results": [], "count": 0}`),
   `test_search_empty_query_returns_validation_error` (empty string → JSON with `"error"` key containing `"validation"`)
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Implement `search_knowledge_base(query: str) -> str` tool in `src/mcp_server/server.py` — validate `query` non-empty (return validation error JSON if empty); call `_kb.search(query, top_k=3)`; serialise results to `{"results": [...], "count": N, "query": "..."}` per `contracts/tool_schemas.md`; wrap in `try/except Exception as e` returning `json.dumps({"error": str(e), "tool": "search_knowledge_base"})`
+- [X] T007 [US1] Implement `search_knowledge_base(query: str) -> str` tool in `src/mcp_server/server.py` — validate `query` non-empty (return validation error JSON if empty); call `_kb.search(query, top_k=3)`; serialise results to `{"results": [...], "count": N, "query": "..."}` per `contracts/tool_schemas.md`; wrap in `try/except Exception as e` returning `json.dumps({"error": str(e), "tool": "search_knowledge_base"})`
 
 **Acceptance Criteria**:
 - All 3 US1 tests pass: `pytest tests/unit/mcp_server/test_tools.py -k "search" -v`
@@ -106,7 +106,7 @@ No tool logic yet — only scaffold, imports, logging setup, `_ticket_index`, an
 
 > **Write these tests FIRST — they must FAIL before T009 is implemented.**
 
-- [ ] T008 [US2] Add 5 test functions to `tests/unit/mcp_server/test_tools.py`:
+- [X] T008 [US2] Add 5 test functions to `tests/unit/mcp_server/test_tools.py`:
   `test_create_ticket_returns_id` (valid inputs → response contains `ticket_id` starting with `"TKT-"`),
   `test_create_ticket_new_customer` (unknown customer_id → ticket still created, customer profile created),
   `test_create_ticket_invalid_channel` (channel=`"fax"` → JSON error containing `"validation"`),
@@ -115,7 +115,7 @@ No tool logic yet — only scaffold, imports, logging setup, `_ticket_index`, an
 
 ### Implementation for User Story 2 ⚠️ HIGH RISK
 
-- [ ] T009 [US2] Implement `create_ticket(customer_id: str, issue: str, priority: str, channel: str) -> str` tool in `src/mcp_server/server.py` ⚠️ **HIGH RISK** (_ticket_index population is critical for all subsequent ticket-scoped tools) — before try block: validate `priority` in `{"low","medium","high","critical"}` (error if not); validate `channel` in `{"email","whatsapp","web_form"}` (error if not); validate `issue` non-empty (error if empty); validate `customer_id` non-empty (error if empty); inside try: call `store.get_or_create_customer(key=customer_id, name=customer_id, channel=channel)`, `store.get_or_create_conversation(customer_key=customer_id, channel=channel)`, `store.add_topic(conv.id, issue[:100])`; generate `ticket_id = conv.ticket.id`; register `_ticket_index[ticket_id] = conv.id`; return `json.dumps({"ticket_id": ticket_id, "customer_id": customer_id, "status": "open", "channel": channel, "created_at": conv.ticket.opened_at})`
+- [X] T009 [US2] Implement `create_ticket(customer_id: str, issue: str, priority: str, channel: str) -> str` tool in `src/mcp_server/server.py` ⚠️ **HIGH RISK** (_ticket_index population is critical for all subsequent ticket-scoped tools) — before try block: validate `priority` in `{"low","medium","high","critical"}` (error if not); validate `channel` in `{"email","whatsapp","web_form"}` (error if not); validate `issue` non-empty (error if empty); validate `customer_id` non-empty (error if empty); inside try: call `store.get_or_create_customer(key=customer_id, name=customer_id, channel=channel)`, `store.get_or_create_conversation(customer_key=customer_id, channel=channel)`, `store.add_topic(conv.id, issue[:100])`; generate `ticket_id = conv.ticket.id`; register `_ticket_index[ticket_id] = conv.id`; return `json.dumps({"ticket_id": ticket_id, "customer_id": customer_id, "status": "open", "channel": channel, "created_at": conv.ticket.opened_at})`
 
 **Acceptance Criteria**:
 - All 5 US2 tests pass: `pytest tests/unit/mcp_server/test_tools.py -k "create_ticket" -v`
@@ -137,7 +137,7 @@ No tool logic yet — only scaffold, imports, logging setup, `_ticket_index`, an
 
 > **Write these tests FIRST — they must FAIL before T011 is implemented.**
 
-- [ ] T010 [US5] Add 4 test functions to `tests/unit/mcp_server/test_tools.py`:
+- [X] T010 [US5] Add 4 test functions to `tests/unit/mcp_server/test_tools.py`:
   `test_send_response_success` (create ticket first, then call send_response with valid channel → response contains `delivery_status == "delivered"`, `channel`, `timestamp`),
   `test_send_response_invalid_channel` (channel=`"sms"` → JSON error containing `"validation"`),
   `test_send_response_empty_message` (message=`""` → JSON error containing `"validation"`),
@@ -145,7 +145,7 @@ No tool logic yet — only scaffold, imports, logging setup, `_ticket_index`, an
 
 ### Implementation for User Story 5
 
-- [ ] T011 [US5] Implement `send_response(ticket_id: str, message: str, channel: str) -> str` tool in `src/mcp_server/server.py` — before try: validate `channel` in `{"email","whatsapp","web_form"}` (validation error if not); validate `message` non-empty (validation error if empty); inside try: lookup `conv_id = _ticket_index.get(ticket_id)`, if missing return not-found JSON; call `store.add_message(conv_id, message_obj)` where `message_obj` is a simulated outbound `Message`; log to stderr: `logging.info("[SIMULATED SEND] channel=%s ticket=%s len=%d", channel, ticket_id, len(message))`; return `json.dumps({"delivery_status":"delivered","ticket_id":ticket_id,"channel":channel,"message_length":len(message),"timestamp":"<utc_iso>"})`
+- [X] T011 [US5] Implement `send_response(ticket_id: str, message: str, channel: str) -> str` tool in `src/mcp_server/server.py` — before try: validate `channel` in `{"email","whatsapp","web_form"}` (validation error if not); validate `message` non-empty (validation error if empty); inside try: lookup `conv_id = _ticket_index.get(ticket_id)`, if missing return not-found JSON; call `store.add_message(conv_id, message_obj)` where `message_obj` is a simulated outbound `Message`; log to stderr: `logging.info("[SIMULATED SEND] channel=%s ticket=%s len=%d", channel, ticket_id, len(message))`; return `json.dumps({"delivery_status":"delivered","ticket_id":ticket_id,"channel":channel,"message_length":len(message),"timestamp":"<utc_iso>"})`
 
 **Acceptance Criteria**:
 - All 4 US5 tests pass: `pytest tests/unit/mcp_server/test_tools.py -k "send_response" -v`
@@ -166,14 +166,14 @@ No tool logic yet — only scaffold, imports, logging setup, `_ticket_index`, an
 
 > **Write these tests FIRST — they must FAIL before T013 is implemented.**
 
-- [ ] T012 [US3] Add 3 test functions to `tests/unit/mcp_server/test_tools.py`:
+- [X] T012 [US3] Add 3 test functions to `tests/unit/mcp_server/test_tools.py`:
   `test_history_multichannel` (create 2 tickets across different channels for same customer → history response includes both channels in `channels_used`, `conversation_count == 2`),
   `test_history_unknown_customer` (unknown customer_id → `{"conversation_count": 0, "conversations": []}`, no error key),
   `test_history_empty_customer_id` (customer_id=`""` → JSON error containing `"validation"`)
 
 ### Implementation for User Story 3
 
-- [ ] T013 [US3] Implement `get_customer_history(customer_id: str) -> str` tool in `src/mcp_server/server.py` — before try: validate `customer_id` non-empty (validation error if empty); inside try: call `store.get_customer(customer_id)`, if None return empty history JSON `{"customer_id":..., "name":null, "channels_used":[], "conversation_count":0, "conversations":[]}`; iterate `profile.conversation_ids`, for each `conv_id` fetch `store._conversations[conv_id]` and build conversation summary dict; return `json.dumps({"customer_id":..., "name":..., "channels_used":list(profile.channels_used), "conversation_count":..., "conversations":[...]})` per `data-model.md`
+- [X] T013 [US3] Implement `get_customer_history(customer_id: str) -> str` tool in `src/mcp_server/server.py` — before try: validate `customer_id` non-empty (validation error if empty); inside try: call `store.get_customer(customer_id)`, if None return empty history JSON `{"customer_id":..., "name":null, "channels_used":[], "conversation_count":0, "conversations":[]}`; iterate `profile.conversation_ids`, for each `conv_id` fetch `store._conversations[conv_id]` and build conversation summary dict; return `json.dumps({"customer_id":..., "name":..., "channels_used":list(profile.channels_used), "conversation_count":..., "conversations":[...]})` per `data-model.md`
 
 **Acceptance Criteria**:
 - All 3 US3 tests pass: `pytest tests/unit/mcp_server/test_tools.py -k "history" -v`
@@ -195,14 +195,14 @@ transitions and optional OpenAI dependency.
 
 > **Write these tests FIRST — they must FAIL before T015 is implemented.**
 
-- [ ] T014 [US4] Add 3 test functions to `tests/unit/mcp_server/test_tools.py`:
+- [X] T014 [US4] Add 3 test functions to `tests/unit/mcp_server/test_tools.py`:
   `test_escalate_success` (create ticket, then escalate → response contains `escalation_id` starting with `"ESC-"`, `status == "escalated"`),
   `test_escalate_unknown_ticket` (ticket_id not in `_ticket_index` → JSON error containing `"not found"`),
   `test_escalate_already_escalated` (create ticket, escalate once, escalate again → returns JSON error containing `"invalid transition"` or idempotent response — NOT an unhandled exception)
 
 ### Implementation for User Story 4
 
-- [ ] T015 [US4] Implement `escalate_to_human(ticket_id: str, reason: str) -> str` tool in `src/mcp_server/server.py` ⚠️ **HIGH RISK** (state transition validation + OpenAI fallback) — before try: validate `reason` non-empty (validation error if empty); validate `ticket_id` non-empty (validation error if empty); inside try: lookup `conv_id = _ticket_index.get(ticket_id)`, if missing return not-found JSON; call `store.transition_ticket(conv_id, TicketStatus.ESCALATED)` — catch `ValueError` from invalid transitions and return as JSON error; generate `escalation_id = "ESC-" + uuid.uuid4().hex[:8]`; check `os.getenv("OPENAI_API_KEY")` — if absent, skip evaluator call and escalate unconditionally (log warning to stderr); return `json.dumps({"escalation_id":..., "ticket_id":..., "status":"escalated", "reason":reason, "escalated_at":"<utc_iso>"})`
+- [X] T015 [US4] Implement `escalate_to_human(ticket_id: str, reason: str) -> str` tool in `src/mcp_server/server.py` ⚠️ **HIGH RISK** (state transition validation + OpenAI fallback) — before try: validate `reason` non-empty (validation error if empty); validate `ticket_id` non-empty (validation error if empty); inside try: lookup `conv_id = _ticket_index.get(ticket_id)`, if missing return not-found JSON; call `store.transition_ticket(conv_id, TicketStatus.ESCALATED)` — catch `ValueError` from invalid transitions and return as JSON error; generate `escalation_id = "ESC-" + uuid.uuid4().hex[:8]`; check `os.getenv("OPENAI_API_KEY")` — if absent, skip evaluator call and escalate unconditionally (log warning to stderr); return `json.dumps({"escalation_id":..., "ticket_id":..., "status":"escalated", "reason":reason, "escalated_at":"<utc_iso>"})`
 
 **Acceptance Criteria**:
 - All 3 US4 tests pass: `pytest tests/unit/mcp_server/test_tools.py -k "escalate" -v`
@@ -224,7 +224,7 @@ transitions and optional OpenAI dependency.
 
 > **Write these tests FIRST — they must FAIL before T017 is implemented.**
 
-- [ ] T016 [US7] Add 4 test functions to `tests/unit/mcp_server/test_tools.py`:
+- [X] T016 [US7] Add 4 test functions to `tests/unit/mcp_server/test_tools.py`:
   `test_resolve_success` (create ticket, call resolve_ticket with non-empty summary → `status == "resolved"`, `resolution_summary` in response),
   `test_resolve_already_resolved_idempotent` (create ticket, resolve, resolve again → second call returns JSON with `status == "resolved"` and `"note"` field, NOT an exception),
   `test_resolve_empty_summary` (resolution_summary=`""` → JSON error containing `"validation"`),
@@ -232,7 +232,7 @@ transitions and optional OpenAI dependency.
 
 ### Implementation for User Story 7
 
-- [ ] T017 [US7] Implement `resolve_ticket(ticket_id: str, resolution_summary: str) -> str` tool in `src/mcp_server/server.py` ⚠️ **HIGH RISK** (idempotency logic must handle already-RESOLVED terminal state) — before try: validate `resolution_summary` non-empty (validation error if empty); validate `ticket_id` non-empty (validation error if empty); inside try: lookup `conv_id = _ticket_index.get(ticket_id)`, if missing return not-found JSON; fetch `conv = store._conversations[conv_id]`; if `conv.ticket.status == TicketStatus.RESOLVED` return idempotent JSON `{"ticket_id":..., "status":"resolved", "note":"ticket was already resolved", "resolved_at":conv.ticket.closed_at}`; else call `store.transition_ticket(conv_id, TicketStatus.RESOLVED)` (catch `ValueError` for invalid transitions); call `store.add_topic(conv_id, f"resolved:{resolution_summary[:100]}")`; return `json.dumps({"ticket_id":..., "status":"resolved", "resolution_summary":resolution_summary, "resolved_at":"<utc_iso>"})`
+- [X] T017 [US7] Implement `resolve_ticket(ticket_id: str, resolution_summary: str) -> str` tool in `src/mcp_server/server.py` ⚠️ **HIGH RISK** (idempotency logic must handle already-RESOLVED terminal state) — before try: validate `resolution_summary` non-empty (validation error if empty); validate `ticket_id` non-empty (validation error if empty); inside try: lookup `conv_id = _ticket_index.get(ticket_id)`, if missing return not-found JSON; fetch `conv = store._conversations[conv_id]`; if `conv.ticket.status == TicketStatus.RESOLVED` return idempotent JSON `{"ticket_id":..., "status":"resolved", "note":"ticket was already resolved", "resolved_at":conv.ticket.closed_at}`; else call `store.transition_ticket(conv_id, TicketStatus.RESOLVED)` (catch `ValueError` for invalid transitions); call `store.add_topic(conv_id, f"resolved:{resolution_summary[:100]}")`; return `json.dumps({"ticket_id":..., "status":"resolved", "resolution_summary":resolution_summary, "resolved_at":"<utc_iso>"})`
 
 **Acceptance Criteria**:
 - All 4 US7 tests pass: `pytest tests/unit/mcp_server/test_tools.py -k "resolve" -v`
@@ -253,14 +253,14 @@ transitions and optional OpenAI dependency.
 
 > **Write these tests FIRST — they must FAIL before T019 is implemented.**
 
-- [ ] T018 [US6] Add 3 test functions to `tests/unit/mcp_server/test_tools.py`:
+- [X] T018 [US6] Add 3 test functions to `tests/unit/mcp_server/test_tools.py`:
   `test_sentiment_insufficient_data` (create ticket with <3 inbound messages → response `trend == "stable"` and `"note": "insufficient data"`),
   `test_sentiment_unknown_customer` (unknown customer_id → response with `trend == "stable"`, `window_scores == []`, `recommend_escalation == false`),
   `test_sentiment_empty_customer_id` (customer_id=`""` → JSON error containing `"validation"`)
 
 ### Implementation for User Story 6
 
-- [ ] T019 [US6] Implement `get_sentiment_trend(customer_id: str) -> str` tool in `src/mcp_server/server.py` — before try: validate `customer_id` non-empty (validation error if empty); inside try: call `store.get_customer(customer_id)`, if None return stable empty trend JSON `{"customer_id":..., "trend":"stable", "window_scores":[], "window_size":3, "recommend_escalation":false, "note":"no history found"}`; get active or most recent conversation from `profile.conversation_ids`; call `store.compute_sentiment_trend(conv)` to get `SentimentTrend` result; map trend fields to JSON response `{"customer_id":..., "trend":trend.label, "window_scores":trend.window_scores, "window_size":3, "recommend_escalation":trend.label == "deteriorating"}`; add `"note": "insufficient data"` key if fewer than 3 data points
+- [X] T019 [US6] Implement `get_sentiment_trend(customer_id: str) -> str` tool in `src/mcp_server/server.py` — before try: validate `customer_id` non-empty (validation error if empty); inside try: call `store.get_customer(customer_id)`, if None return stable empty trend JSON `{"customer_id":..., "trend":"stable", "window_scores":[], "window_size":3, "recommend_escalation":false, "note":"no history found"}`; get active or most recent conversation from `profile.conversation_ids`; call `store.compute_sentiment_trend(conv)` to get `SentimentTrend` result; map trend fields to JSON response `{"customer_id":..., "trend":trend.label, "window_scores":trend.window_scores, "window_size":3, "recommend_escalation":trend.label == "deteriorating"}`; add `"note": "insufficient data"` key if fewer than 3 data points
 
 **Acceptance Criteria**:
 - All 3 US6 tests pass: `pytest tests/unit/mcp_server/test_tools.py -k "sentiment" -v`
@@ -275,13 +275,13 @@ transitions and optional OpenAI dependency.
 
 **Purpose**: Integration validation, regression gate, and registration.
 
-- [ ] T020 Add cross-tool integration test `test_fresh_store_all_tools_no_crash` to `tests/unit/mcp_server/test_tools.py` — on a fresh empty store (autouse fixture handles reset), call all 7 tools with valid-format inputs and assert each returns a valid JSON string (no exception propagates, no Python object returned)
+- [X] T020 Add cross-tool integration test `test_fresh_store_all_tools_no_crash` to `tests/unit/mcp_server/test_tools.py` — on a fresh empty store (autouse fixture handles reset), call all 7 tools with valid-format inputs and assert each returns a valid JSON string (no exception propagates, no Python object returned)
 
-- [ ] T021 Run full regression suite `pytest -v` from project root — confirm all 52 pre-existing tests AND all new MCP server tests pass (SC-006: no existing tests may be broken)
+- [X] T021 Run full regression suite `pytest -v` from project root — confirm all 52 pre-existing tests AND all new MCP server tests pass (SC-006: no existing tests may be broken)
 
-- [ ] T022 [P] Create or update `.claude.json` at project root with `mcpServers.nexaflow-crm` entry per `specs/003-mcp-server/quickstart.md` — command `python`, args `["-m", "src.mcp_server.server"]`, cwd `/home/ps_qasim/projects/crm-digital-fte`
+- [X] T022 [P] Create or update `.claude.json` at project root with `mcpServers.nexaflow-crm` entry per `specs/003-mcp-server/quickstart.md` — command `python`, args `["-m", "src.mcp_server.server"]`, cwd `/home/ps_qasim/projects/crm-digital-fte`
 
-- [ ] T023 Integration smoke test — run `echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | python -m src.mcp_server.server` and confirm output contains all 7 tool names: `search_knowledge_base`, `create_ticket`, `get_customer_history`, `escalate_to_human`, `send_response`, `get_sentiment_trend`, `resolve_ticket` (SC-001)
+- [X] T023 Integration smoke test — run `echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | python -m src.mcp_server.server` and confirm output contains all 7 tool names: `search_knowledge_base`, `create_ticket`, `get_customer_history`, `escalate_to_human`, `send_response`, `get_sentiment_trend`, `resolve_ticket` (SC-001)
 
 **Acceptance Criteria**:
 - `pytest -v` exits 0 with ≥52 + new MCP tests all green
