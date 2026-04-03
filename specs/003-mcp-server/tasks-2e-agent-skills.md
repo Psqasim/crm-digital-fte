@@ -16,7 +16,7 @@ description: "Phase 2E — Agent Skills Definition + Wiring task list"
 
 **Purpose**: Verify all existing target functions are importable and available before wiring.
 
-- [ ] T001 Confirm all 5 target functions are importable: `resolve_identity` (conversation_store.py:114), `compute_sentiment_trend` (conversation_store.py:268), `KnowledgeBase.search` (knowledge_base.py:66), `evaluate_escalation` (escalation_evaluator.py:64), `format_response` (channel_formatter.py:17)
+- [X] T001 Confirm all 5 target functions are importable: `resolve_identity` (conversation_store.py:114), `compute_sentiment_trend` (conversation_store.py:268), `KnowledgeBase.search` (knowledge_base.py:66), `evaluate_escalation` (escalation_evaluator.py:64), `format_response` (channel_formatter.py:17)
 
   **Acceptance criteria**: Run `python -c "from src.agent.conversation_store import ConversationStore; from src.agent.knowledge_base import KnowledgeBase; from src.agent.escalation_evaluator import evaluate_escalation; from src.agent.channel_formatter import format_response; print('OK')"` exits 0.
 
@@ -32,7 +32,7 @@ description: "Phase 2E — Agent Skills Definition + Wiring task list"
 
 **⚠️ CRITICAL**: T003–T010 all import from `skills_manifest.py` — do not start them until T002 is complete.
 
-- [ ] T002 Create `src/agent/skills_manifest.py` — `SkillManifest` frozen dataclass + 5 constants + `SKILLS` list
+- [X] T002 Create `src/agent/skills_manifest.py` — `SkillManifest` frozen dataclass + 5 constants + `SKILLS` list
 
   **File**: `src/agent/skills_manifest.py` (new file)
 
@@ -86,7 +86,7 @@ description: "Phase 2E — Agent Skills Definition + Wiring task list"
 
 **Independent Test**: Import `SkillsInvoker`, call `run()` with a TicketMessage whose email is unknown; verify `customer_id_result.is_returning_customer == False` and `resolution_action == "created_new"`.
 
-- [ ] T003 [P] Create result dataclasses in `src/agent/skills_invoker.py` — `CustomerIdentificationResult`, `SentimentAnalysisResult`, `KnowledgeRetrievalResult`, `EscalationDecisionResult`, `ChannelAdaptationResult`, `InvokerResult`
+- [X] T003 [P] Create result dataclasses in `src/agent/skills_invoker.py` — `CustomerIdentificationResult`, `SentimentAnalysisResult`, `KnowledgeRetrievalResult`, `EscalationDecisionResult`, `ChannelAdaptationResult`, `InvokerResult`
 
   **File**: `src/agent/skills_invoker.py` (new file — skeleton only, no method bodies yet)
 
@@ -101,7 +101,7 @@ description: "Phase 2E — Agent Skills Definition + Wiring task list"
   **Test needed**: Yes (T010 covers this)
   **Risk**: LOW
 
-- [ ] T004 [US5] Implement `SkillsInvoker._run_customer_identification(msg)` in `src/agent/skills_invoker.py`
+- [X] T004 [US5] Implement `SkillsInvoker._run_customer_identification(msg)` in `src/agent/skills_invoker.py`
 
   **File**: `src/agent/skills_invoker.py` (modify stub from T003)
 
@@ -147,7 +147,7 @@ description: "Phase 2E — Agent Skills Definition + Wiring task list"
 
 **Independent Test**: Create a conversation with 3 negative messages, call `_run_sentiment_analysis`; verify `trend_label == "deteriorating"` and `escalation_recommended == True`.
 
-- [ ] T005 [US2] Implement `SkillsInvoker._run_sentiment_analysis(msg, cid_result)` in `src/agent/skills_invoker.py`
+- [X] T005 [US2] Implement `SkillsInvoker._run_sentiment_analysis(msg, cid_result)` in `src/agent/skills_invoker.py`
 
   **File**: `src/agent/skills_invoker.py`
 
@@ -186,7 +186,7 @@ description: "Phase 2E — Agent Skills Definition + Wiring task list"
 
 **Independent Test**: Call `_run_knowledge_retrieval` with a message containing "How do I connect NexaFlow to Slack?"; verify `result_count >= 1` and `results[0].relevance_score > 0.0`.
 
-- [ ] T006 [US1] Implement `SkillsInvoker._run_knowledge_retrieval(msg)` in `src/agent/skills_invoker.py`
+- [X] T006 [US1] Implement `SkillsInvoker._run_knowledge_retrieval(msg)` in `src/agent/skills_invoker.py`
 
   **File**: `src/agent/skills_invoker.py`
 
@@ -222,7 +222,7 @@ description: "Phase 2E — Agent Skills Definition + Wiring task list"
 
 **Independent Test**: Call `_run_escalation_decision` with a message containing "I am going to sue NexaFlow"; verify `should_escalate=True` and `urgency="critical"`.
 
-- [ ] T007 [US3] Implement `SkillsInvoker._run_escalation_decision(msg, sentiment_result)` in `src/agent/skills_invoker.py`
+- [X] T007 [US3] Implement `SkillsInvoker._run_escalation_decision(msg, sentiment_result)` in `src/agent/skills_invoker.py`
 
   **File**: `src/agent/skills_invoker.py`
 
@@ -260,7 +260,7 @@ description: "Phase 2E — Agent Skills Definition + Wiring task list"
 
 **Independent Test**: Call `apply_channel_adaptation` with a 10-sentence response and `channel="whatsapp"`; verify `formatted_response` contains at most 3 sentences and `"truncated"` appears in `formatting_notes`.
 
-- [ ] T008 [US4] Implement `SkillsInvoker.apply_channel_adaptation(result, raw, channel, name)` in `src/agent/skills_invoker.py`
+- [X] T008 [US4] Implement `SkillsInvoker.apply_channel_adaptation(result, raw, channel, name)` in `src/agent/skills_invoker.py`
 
   **File**: `src/agent/skills_invoker.py`
 
@@ -305,7 +305,7 @@ description: "Phase 2E — Agent Skills Definition + Wiring task list"
 
 **Purpose**: Wire skills 0→4 into `SkillsInvoker.run()` and create `SkillsRegistry`. These complete the invoker module.
 
-- [ ] T009a [P] Create `src/agent/skills_registry.py` — `SkillsRegistry` class with `get_skill(skill_id)` and `list_skills()`
+- [X] T009a [P] Create `src/agent/skills_registry.py` — `SkillsRegistry` class with `get_skill(skill_id)` and `list_skills()`
 
   **File**: `src/agent/skills_registry.py` (new file)
 
@@ -341,7 +341,7 @@ description: "Phase 2E — Agent Skills Definition + Wiring task list"
   **Test needed**: Yes (T010 covers this)
   **Risk**: LOW
 
-- [ ] T009b [P] Implement `SkillsInvoker.__init__()` and `SkillsInvoker.run()` in `src/agent/skills_invoker.py`
+- [X] T009b [P] Implement `SkillsInvoker.__init__()` and `SkillsInvoker.run()` in `src/agent/skills_invoker.py`
 
   **File**: `src/agent/skills_invoker.py`
 
@@ -372,7 +372,7 @@ description: "Phase 2E — Agent Skills Definition + Wiring task list"
 
 **MANDATORY**: Run `python -m pytest tests/ -v` immediately after completing this task. All 79 tests must pass before committing.
 
-- [ ] T009c ⚠️ **[HIGH RISK]** Update `src/agent/prototype.py::process_ticket` to delegate to `SkillsInvoker` — `src/agent/prototype.py`
+- [X] T009c ⚠️ **[HIGH RISK]** Update `src/agent/prototype.py::process_ticket` to delegate to `SkillsInvoker` — `src/agent/prototype.py`
 
   **File**: `src/agent/prototype.py` (modify existing)
 
@@ -434,7 +434,7 @@ description: "Phase 2E — Agent Skills Definition + Wiring task list"
 
 **Purpose**: Add explicit tests for the new skills layer so regressions are caught in future phases.
 
-- [ ] T010 Create `tests/test_skills.py` — registry lookup + invoker orchestration order tests
+- [X] T010 Create `tests/test_skills.py` — registry lookup + invoker orchestration order tests
 
   **File**: `tests/test_skills.py` (new file)
 
@@ -496,7 +496,7 @@ description: "Phase 2E — Agent Skills Definition + Wiring task list"
 
 ## Phase 11: Polish
 
-- [ ] T011 [P] Update `CLAUDE.md` Recent Changes entry to note Phase 2E implementation complete: `src/agent/skills_manifest.py`, `src/agent/skills_registry.py`, `src/agent/skills_invoker.py`
+- [X] T011 [P] Update `CLAUDE.md` Recent Changes entry to note Phase 2E implementation complete: `src/agent/skills_manifest.py`, `src/agent/skills_registry.py`, `src/agent/skills_invoker.py`
 
   **File**: `CLAUDE.md`
   **Dependencies**: T010

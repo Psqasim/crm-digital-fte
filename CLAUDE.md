@@ -338,6 +338,7 @@ TWILIO_WHATSAPP_NUMBER=
 ```
 
 ## Recent Changes
+- 003-mcp-server (Phase 2E implementation complete): Added `src/agent/skills_manifest.py` (SkillManifest dataclass + 5 skill constants), `src/agent/skills_registry.py` (SkillsRegistry with get_skill/list_skills), `src/agent/skills_invoker.py` (full pipeline invoker — CustomerIdentification→Sentiment→KB→Escalation→ChannelAdaptation). Wired `src/agent/prototype.py::process_ticket` through SkillsInvoker. Added `tests/test_skills.py` (22 tests). Full suite: 101/101 passing.
 - 003-mcp-server (Phase 2E): Added `specs/003-mcp-server/spec-2e-agent-skills.md` — 5 skill manifests (CustomerIdentification, SentimentAnalysis, KnowledgeRetrieval, EscalationDecision, ChannelAdaptation). No new code or dependencies.
 - 003-mcp-server: Added Python 3.12 + `mcp>=1.2.0` (FastMCP), `openai>=1.0`, `python-dotenv>=1.0.0`
 - 002-memory-state: Added Python 3.12 + OpenAI (already installed), python-dotenv (already installed) — no new external dependencies

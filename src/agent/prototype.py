@@ -30,8 +30,10 @@ from src.agent.models import (
     TicketStatus,
 )
 from src.agent.prompts import get_system_prompt
+from src.agent.skills_invoker import EscalationDecisionResult, SkillsInvoker
 
 _kb = KnowledgeBase()
+_invoker = SkillsInvoker()
 _openai_client: OpenAI | None = None
 
 _ESCALATION_ACK_TEMPLATE = (
@@ -46,6 +48,15 @@ def _get_openai() -> OpenAI:
     if _openai_client is None:
         _openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
     return _openai_client
+
+
+def _map_escalation(r: EscalationDecisionResult) -> EscalationDecision:
+    return EscalationDecision(
+        should_escalate=r.should_escalate,
+        reason=r.reason or "",
+        urgency=r.urgency or "normal",
+        raw_llm_response="",
+    )
 
 
 def _make_inbound_message(ticket: NormalizedTicket, escalation: EscalationDecision, dt_str: str) -> Message:
@@ -143,41 +154,19 @@ def process_ticket(msg: TicketMessage) -> AgentResponse:
     # Step 1: Normalize
     ticket = normalize_message(msg)
 
-    # Step 1b: Resolve identity + load history (T015)
+    # Step 1b–3: Run skills pipeline (Customer ID → Sentiment → KB → Escalation)
+    inv_result = _invoker.run(msg)
+    customer_key = inv_result.customer_id_result.customer_id
+    escalation = _map_escalation(inv_result.escalation_result)
+    kb_results = inv_result.kb_result.results if inv_result.kb_result else []
+
     store = get_store()
-    customer_key = store.resolve_identity(
-        email=ticket.customer_email,
-        phone=ticket.customer_phone,
-    )
-
-    # T022: If customer_key is transient phone: key, try to extract email from message text
-    if customer_key.startswith("phone:") and ticket.customer_phone:
-        extracted_emails = re.findall(r"[\w.+-]+@[\w.-]+\.[a-z]{2,}", ticket.message)
-        if extracted_emails:
-            extracted_email = extracted_emails[0]
-            store.link_phone_to_email(ticket.customer_phone, extracted_email)
-            customer_key = store.resolve_identity(
-                email=extracted_email,
-                phone=ticket.customer_phone,
-            )
-
-    store.get_or_create_customer(
-        key=customer_key,
-        name=ticket.customer_name,
-        channel=ticket.channel.value,
-    )
     conversation = store.get_or_create_conversation(
         customer_key=customer_key,
         channel=ticket.channel.value,
     )
     conversation_context = store.get_conversation_context(customer_key)
     prior_topic = store.has_prior_topic(customer_key, ticket.inferred_topic)
-
-    # Step 2: Search knowledge base
-    kb_results = _kb.search(ticket.inferred_topic + " " + ticket.message[:200])
-
-    # Step 3: Evaluate escalation (always — never skip)
-    escalation = evaluate_escalation(ticket.message)
 
     # Step 4: Short-circuit on escalation — skip LLM generation
     if escalation.should_escalate:
@@ -249,8 +238,11 @@ def process_ticket(msg: TicketMessage) -> AgentResponse:
 
     raw_response = completion.choices[0].message.content or ""
 
-    # Step 6: Format for channel
-    formatted = format_response(raw_response, ticket.channel, ticket.customer_first_name)
+    # Step 6: Format for channel via SkillsInvoker (Channel Adaptation skill)
+    inv_result = _invoker.apply_channel_adaptation(
+        inv_result, raw_response, ticket.channel.value, ticket.customer_first_name
+    )
+    formatted = inv_result.channel_result.formatted_response
 
     elapsed = time.monotonic() * 1000 - start_ms
 
