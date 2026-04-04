@@ -1,1 +1,6 @@
-# Phase 4X will implement this — see specs/customer-success-fte-spec.md
+# Phase 4A: Neon PostgreSQL + pgvector
+asyncpg>=0.29.0
+openai>=1.0
+python-dotenv>=1.0.0
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
