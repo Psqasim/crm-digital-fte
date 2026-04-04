@@ -28,7 +28,7 @@ Must be complete before any tool or agent work begins.
 
 **⚠️ CRITICAL**: No Phase 3/4/5 work until this phase is complete.
 
-- [ ] T001 Create `production/agent/schemas.py` — 5 Pydantic v2 input models (plan T-001)
+- [X] T001 Create `production/agent/schemas.py` — 5 Pydantic v2 input models (plan T-001)
   - **File**: `production/agent/schemas.py` (NEW)
   - **Acceptance**:
     - `SearchKBInput(query: str max_length=500 min_length=1, limit: int=5 ge=1 le=20)`
@@ -41,7 +41,7 @@ Must be complete before any tool or agent work begins.
   - **Depends on**: None
   - **Test needed**: No (Pydantic self-validates; exercised in T006/T008/T012/T014/T021)
 
-- [ ] T002 [P] Create `production/agent/prompts.py` — `build_system_prompt(channel, customer_name) -> str` (plan T-002)
+- [X] T002 [P] Create `production/agent/prompts.py` — `build_system_prompt(channel, customer_name) -> str` (plan T-002)
   - **File**: `production/agent/prompts.py` (REPLACE stub)
   - **Acceptance**:
     - `build_system_prompt(channel: str, customer_name: str) -> str` callable
@@ -59,7 +59,7 @@ Must be complete before any tool or agent work begins.
   - **Depends on**: None
   - **Test needed**: No (exercised in T016/T025 agent run)
 
-- [ ] T003 [P] Create `production/agent/formatters.py` — `FormattedResponse` + 3 channel formatters (plan T-003)
+- [X] T003 [P] Create `production/agent/formatters.py` — `FormattedResponse` + 3 channel formatters (plan T-003)
   - **File**: `production/agent/formatters.py` (REPLACE stub)
   - **Acceptance**:
     - `@dataclass FormattedResponse(formatted_text: str, channel: str, formatting_notes: list[str])`
@@ -95,7 +95,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
 
 ### Test Scaffold (write first)
 
-- [ ] T004 [US1] Create `production/tests/test_agent_tools.py` — scaffold: imports, fixtures, asyncio config (plan T-006 scaffold)
+- [X] T004 [US1] Create `production/tests/test_agent_tools.py` — scaffold: imports, fixtures, asyncio config (plan T-006 scaffold)
   - **File**: `production/tests/test_agent_tools.py` (NEW)
   - **Acceptance**:
     - File exists; `pytest production/tests/test_agent_tools.py` runs 0 tests, 0 errors
@@ -108,7 +108,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
 
 ### Tools — search, create, history, send, resolve
 
-- [ ] T005 ⚠️ HIGH RISK [US1] Create `production/agent/tools.py` with OpenAI client factory + `search_knowledge_base` (plan T-004a)
+- [X] T005 ⚠️ HIGH RISK [US1] Create `production/agent/tools.py` with OpenAI client factory + `search_knowledge_base` (plan T-004a)
   - **File**: `production/agent/tools.py` (REPLACE stub)
   - **Acceptance**:
     - Module-level `_openai_client: AsyncOpenAI | None = None`
@@ -126,7 +126,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T001 (SearchKBInput), Phase 4A `queries.search_knowledge_base`
   - **Test needed**: Yes → T006
 
-- [ ] T006 [US1] Write unit tests for `search_knowledge_base` in `production/tests/test_agent_tools.py` (plan T-006a)
+- [X] T006 [US1] Write unit tests for `search_knowledge_base` in `production/tests/test_agent_tools.py` (plan T-006a)
   - **File**: `production/tests/test_agent_tools.py` (MODIFY)
   - **Acceptance**:
     - `test_search_knowledge_base_happy_path`: mock embeddings + mock pool returns 2 results → JSON `count == 2`
@@ -136,7 +136,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T004 (scaffold), T005 (implementation)
   - **Test needed**: Yes — `pytest production/tests/test_agent_tools.py::test_search_knowledge_base*`
 
-- [ ] T007 ⚠️ HIGH RISK [US1] Add `create_ticket` tool to `production/agent/tools.py` (plan T-004b)
+- [X] T007 ⚠️ HIGH RISK [US1] Add `create_ticket` tool to `production/agent/tools.py` (plan T-004b)
   - **File**: `production/agent/tools.py` (MODIFY — append function)
   - **Acceptance**:
     - `@function_tool async def create_ticket(params: CreateTicketInput) -> str`
@@ -147,7 +147,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T001 (CreateTicketInput), T005 (module exists)
   - **Test needed**: Yes → T008
 
-- [ ] T008 [US1] Write unit tests for `create_ticket` in `production/tests/test_agent_tools.py` (plan T-006b)
+- [X] T008 [US1] Write unit tests for `create_ticket` in `production/tests/test_agent_tools.py` (plan T-006b)
   - **File**: `production/tests/test_agent_tools.py` (MODIFY)
   - **Acceptance**:
     - `test_create_ticket_happy_path`: mock pool → JSON has `ticket_id` (non-null string)
@@ -157,7 +157,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T004, T007
   - **Test needed**: Yes
 
-- [ ] T009 ⚠️ HIGH RISK [US1] Add `get_customer_history` tool to `production/agent/tools.py` (plan T-004c)
+- [X] T009 ⚠️ HIGH RISK [US1] Add `get_customer_history` tool to `production/agent/tools.py` (plan T-004c)
   - **File**: `production/agent/tools.py` (MODIFY — append function)
   - **Acceptance**:
     - `@function_tool async def get_customer_history(customer_id: Annotated[str, Field(description="Customer UUID")], limit: int = 20) -> str`
@@ -169,7 +169,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T005 (module exists), Phase 4A `queries.get_customer_history`
   - **Test needed**: Yes → T010
 
-- [ ] T010 [US1] Write unit tests for `get_customer_history` in `production/tests/test_agent_tools.py` (plan T-006c)
+- [X] T010 [US1] Write unit tests for `get_customer_history` in `production/tests/test_agent_tools.py` (plan T-006c)
   - **File**: `production/tests/test_agent_tools.py` (MODIFY)
   - **Acceptance**:
     - `test_get_customer_history_happy_path`: mock pool returns 2 conversations → JSON `count == 2`
@@ -179,7 +179,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T004, T009
   - **Test needed**: Yes
 
-- [ ] T011 ⚠️ HIGH RISK [US1] Add `send_response` tool to `production/agent/tools.py` (plan T-004e)
+- [X] T011 ⚠️ HIGH RISK [US1] Add `send_response` tool to `production/agent/tools.py` (plan T-004e)
   - **File**: `production/agent/tools.py` (MODIFY — append function)
   - **Acceptance**:
     - `@function_tool async def send_response(params: SendResponseInput) -> str`
@@ -191,7 +191,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T001 (SendResponseInput), T003 (formatters), T005 (module)
   - **Test needed**: Yes → T012
 
-- [ ] T012 [US1] Write unit tests for `send_response` in `production/tests/test_agent_tools.py` (plan T-006e)
+- [X] T012 [US1] Write unit tests for `send_response` in `production/tests/test_agent_tools.py` (plan T-006e)
   - **File**: `production/tests/test_agent_tools.py` (MODIFY)
   - **Acceptance**:
     - `test_send_response_email_truncation`: 600-word input → `message_length` ≤ (500-word character equivalent); `delivery_status == "stub_delivered"`
@@ -201,7 +201,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T004, T011
   - **Test needed**: Yes
 
-- [ ] T013 ⚠️ HIGH RISK [US1] Add `resolve_ticket` tool to `production/agent/tools.py` (plan T-004g)
+- [X] T013 ⚠️ HIGH RISK [US1] Add `resolve_ticket` tool to `production/agent/tools.py` (plan T-004g)
   - **File**: `production/agent/tools.py` (MODIFY — append function)
   - **Acceptance**:
     - `@function_tool async def resolve_ticket(params: ResolveTicketInput) -> str`
@@ -214,7 +214,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T001 (ResolveTicketInput), T005 (module), Phase 4A `queries.update_ticket_status`
   - **Test needed**: Yes → T014
 
-- [ ] T014 [US1] Write unit tests for `resolve_ticket` in `production/tests/test_agent_tools.py` (plan T-006g)
+- [X] T014 [US1] Write unit tests for `resolve_ticket` in `production/tests/test_agent_tools.py` (plan T-006g)
   - **File**: `production/tests/test_agent_tools.py` (MODIFY)
   - **Acceptance**:
     - `test_resolve_ticket_happy_path`: mock pool returns resolved row → `status == "resolved"`
@@ -226,7 +226,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
 
 ### Agent Core (definition → runner → parser)
 
-- [ ] T015 ⚠️ HIGH RISK [US1] Define `AgentResponse` + `CustomerContext` dataclasses in `production/agent/customer_success_agent.py` (plan T-005 prep)
+- [X] T015 ⚠️ HIGH RISK [US1] Define `AgentResponse` + `CustomerContext` dataclasses in `production/agent/customer_success_agent.py` (plan T-005 prep)
   - **File**: `production/agent/customer_success_agent.py` (REPLACE stub)
   - **Acceptance**:
     - `@dataclass AgentResponse`: `ticket_id: str | None`, `response_text: str`, `channel: str`, `escalated: bool = False`, `escalation_id: str | None = None`, `resolution_status: str = "pending"`, `error: str | None = None`
@@ -236,7 +236,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: None (pure dataclasses)
   - **Test needed**: No
 
-- [ ] T016 ⚠️ HIGH RISK [US1] Implement `Agent` definition inside `process_ticket()` in `production/agent/customer_success_agent.py` (plan T-005a)
+- [X] T016 ⚠️ HIGH RISK [US1] Implement `Agent` definition inside `process_ticket()` in `production/agent/customer_success_agent.py` (plan T-005a)
   - **File**: `production/agent/customer_success_agent.py` (MODIFY)
   - **Acceptance**:
     - `async def process_ticket(ctx: CustomerContext) -> AgentResponse` defined
@@ -248,7 +248,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T002 (prompts), T005–T013 (all tools), T015 (dataclasses)
   - **Test needed**: No (exercised in T017 runner step)
 
-- [ ] T017 ⚠️ HIGH RISK [US1] Add `Runner.run()` call + retry logic to `process_ticket()` in `production/agent/customer_success_agent.py` (plan T-005b)
+- [X] T017 ⚠️ HIGH RISK [US1] Add `Runner.run()` call + retry logic to `process_ticket()` in `production/agent/customer_success_agent.py` (plan T-005b)
   - **File**: `production/agent/customer_success_agent.py` (MODIFY)
   - **Acceptance**:
     - `result = await Runner.run(agent, ctx.message)` called
@@ -259,7 +259,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T016 (Agent definition)
   - **Test needed**: No (tested via T027 integration)
 
-- [ ] T018 ⚠️ HIGH RISK [US1] Add `RunResult` → `AgentResponse` parser to `process_ticket()` in `production/agent/customer_success_agent.py` (plan T-005c)
+- [X] T018 ⚠️ HIGH RISK [US1] Add `RunResult` → `AgentResponse` parser to `process_ticket()` in `production/agent/customer_success_agent.py` (plan T-005c)
   - **File**: `production/agent/customer_success_agent.py` (MODIFY)
   - **Acceptance**:
     - `AgentResponse.response_text = result.final_output` (str)
@@ -281,7 +281,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
 
 **Independent Test**: Call `build_system_prompt(channel="whatsapp", customer_name="Alice")` — WhatsApp tone block present. `build_system_prompt("email", "Bob")` — email block. `build_system_prompt("sms", "Carol")` — default block. No code changes needed to test this — T002 prompts.py already covers it.
 
-- [ ] T019 ⚠️ HIGH RISK [US2] Wire channel-aware instruction into `process_ticket()` in `production/agent/customer_success_agent.py` (plan T-005d)
+- [X] T019 ⚠️ HIGH RISK [US2] Wire channel-aware instruction into `process_ticket()` in `production/agent/customer_success_agent.py` (plan T-005d)
   - **File**: `production/agent/customer_success_agent.py` (MODIFY)
   - **Acceptance**:
     - `ctx.channel` passed correctly to `build_system_prompt(ctx.channel, ctx.customer_name)` — confirmed in T016; this task verifies and documents, adds assertion/log
@@ -304,7 +304,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
 
 **Independent Test**: `pytest production/tests/test_agent_tools.py -k "escalate or sentiment"` — all 6 tests pass without live DB.
 
-- [ ] T020 ⚠️ HIGH RISK [US3] Add `escalate_to_human` tool to `production/agent/tools.py` (plan T-004d)
+- [X] T020 ⚠️ HIGH RISK [US3] Add `escalate_to_human` tool to `production/agent/tools.py` (plan T-004d)
   - **File**: `production/agent/tools.py` (MODIFY — append function)
   - **Acceptance**:
     - `@function_tool async def escalate_to_human(params: EscalateInput) -> str`
@@ -317,7 +317,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T001 (EscalateInput), T005 (module), Phase 4A `queries.update_ticket_status`
   - **Test needed**: Yes → T021
 
-- [ ] T021 [US3] Write unit tests for `escalate_to_human` in `production/tests/test_agent_tools.py` (plan T-006d)
+- [X] T021 [US3] Write unit tests for `escalate_to_human` in `production/tests/test_agent_tools.py` (plan T-006d)
   - **File**: `production/tests/test_agent_tools.py` (MODIFY)
   - **Acceptance**:
     - `test_escalate_to_human_happy_path`: mock pool → JSON has `escalation_id` (valid UUID), `status == "escalated"`
@@ -327,7 +327,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T004, T020
   - **Test needed**: Yes
 
-- [ ] T022 ⚠️ HIGH RISK [US3] Add `get_sentiment_trend` tool to `production/agent/tools.py` (plan T-004f)
+- [X] T022 ⚠️ HIGH RISK [US3] Add `get_sentiment_trend` tool to `production/agent/tools.py` (plan T-004f)
   - **File**: `production/agent/tools.py` (MODIFY — append function)
   - **Acceptance**:
     - `@function_tool async def get_sentiment_trend(customer_id: Annotated[str, Field(description="Customer UUID")], last_n: int = 5) -> str`
@@ -344,7 +344,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T005 (module), Phase 4A `queries.get_sentiment_trend`
   - **Test needed**: Yes → T023
 
-- [ ] T023 [US3] Write unit tests for `get_sentiment_trend` in `production/tests/test_agent_tools.py` (plan T-006f)
+- [X] T023 [US3] Write unit tests for `get_sentiment_trend` in `production/tests/test_agent_tools.py` (plan T-006f)
   - **File**: `production/tests/test_agent_tools.py` (MODIFY)
   - **Acceptance**:
     - `test_sentiment_trend_improving`: scores `[0.2, 0.4, 0.6]` → `trend == "improving"`, `recommend_escalation == False` (avg 0.4)
@@ -362,7 +362,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
 
 **Purpose**: End-to-end validation of the full agent pipeline. All 5 integration scenarios from plan T-007.
 
-- [ ] T024 Create `production/tests/test_agent_integration.py` — scaffold + skip guard (plan T-007 scaffold)
+- [X] T024 Create `production/tests/test_agent_integration.py` — scaffold + skip guard (plan T-007 scaffold)
   - **File**: `production/tests/test_agent_integration.py` (NEW)
   - **Acceptance**:
     - `pytestmark = pytest.mark.skipif(not os.environ.get("TEST_DATABASE_URL"), reason="TEST_DATABASE_URL not set")` at module level
@@ -372,7 +372,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T015–T018 (full process_ticket)
   - **Test needed**: Yes — `pytest production/tests/test_agent_integration.py` returns exit 0 (skipped)
 
-- [ ] T025 [P] Write `TestNewCustomerFlow` in `production/tests/test_agent_integration.py` (plan T-007 — full run)
+- [X] T025 [P] Write `TestNewCustomerFlow` in `production/tests/test_agent_integration.py` (plan T-007 — full run)
   - **File**: `production/tests/test_agent_integration.py` (MODIFY)
   - **Acceptance**:
     - `test_new_customer_full_run`: mocked DB pool (no real Neon); mock `Runner.run` returning a `RunResult` with `create_ticket` + `send_response` tool calls and `final_output`
@@ -383,7 +383,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T024 (scaffold)
   - **Test needed**: Yes
 
-- [ ] T026 [P] Write `TestToolCallOrdering` in `production/tests/test_agent_integration.py` (plan T-007 — ordering)
+- [X] T026 [P] Write `TestToolCallOrdering` in `production/tests/test_agent_integration.py` (plan T-007 — ordering)
   - **File**: `production/tests/test_agent_integration.py` (MODIFY)
   - **Acceptance**:
     - `test_create_ticket_before_send_response`: mock RunResult trace contains `create_ticket` call before any `send_response` call
@@ -392,7 +392,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T024
   - **Test needed**: Yes
 
-- [ ] T027 [P] Write `TestAPIErrorRetry` in `production/tests/test_agent_integration.py` (plan T-007 — retry)
+- [X] T027 [P] Write `TestAPIErrorRetry` in `production/tests/test_agent_integration.py` (plan T-007 — retry)
   - **File**: `production/tests/test_agent_integration.py` (MODIFY)
   - **Acceptance**:
     - `test_api_error_retry_escalates`: mock `Runner.run` to raise `openai.APIError` on both calls (first attempt + retry)
@@ -403,7 +403,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T024
   - **Test needed**: Yes
 
-- [ ] T028 [P] Write `TestChannelFormatting` in `production/tests/test_agent_integration.py` (plan T-007 — channel)
+- [X] T028 [P] Write `TestChannelFormatting` in `production/tests/test_agent_integration.py` (plan T-007 — channel)
   - **File**: `production/tests/test_agent_integration.py` (MODIFY)
   - **Acceptance**:
     - `test_email_response_within_limit`: mock RunResult with email channel → verify `response_text` fits within 500-word limit
@@ -413,7 +413,7 @@ Agent definition, Runner wrapper, and RunResult parser live in this phase.
   - **Depends on**: T024
   - **Test needed**: Yes
 
-- [ ] T029 [P] Write `TestEscalationPath` in `production/tests/test_agent_integration.py` (plan T-007 — escalation)
+- [X] T029 [P] Write `TestEscalationPath` in `production/tests/test_agent_integration.py` (plan T-007 — escalation)
   - **File**: `production/tests/test_agent_integration.py` (MODIFY)
   - **Acceptance**:
     - `test_sentiment_escalation`: mock `Runner.run` returns RunResult with `get_sentiment_trend` output `[0.2, 0.1, 0.25]` and `escalate_to_human` tool call → `AgentResponse.escalated == True`
