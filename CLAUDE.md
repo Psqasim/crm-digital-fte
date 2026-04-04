@@ -292,6 +292,11 @@ Current date and time: {current_dt.strftime("%A, %B %d, %Y at %I:%M %p PKT")}
 Use Context7 when you need current API documentation for any library in the stack.
 Use GitHub MCP for all version control operations.
 
+> **Both Context7 and GitHub MCP are active and connected.**
+> Run `/mcp` in Claude Code at any time to verify live connection status.
+> - Context7 tools: `mcp__context7__resolve-library-id`, `mcp__context7__query-docs`
+> - GitHub MCP tools: `mcp__github__*` (PRs, issues, branches, commits, file ops)
+
 ---
 
 ## Spec-Kit Plus Commands
@@ -331,3 +336,14 @@ TWILIO_ACCOUNT_SID=
 TWILIO_AUTH_TOKEN=
 TWILIO_WHATSAPP_NUMBER=
 ```
+
+## Recent Changes
+- 003-mcp-server (Phase 2E implementation complete): Added `src/agent/skills_manifest.py` (SkillManifest dataclass + 5 skill constants), `src/agent/skills_registry.py` (SkillsRegistry with get_skill/list_skills), `src/agent/skills_invoker.py` (full pipeline invoker — CustomerIdentification→Sentiment→KB→Escalation→ChannelAdaptation). Wired `src/agent/prototype.py::process_ticket` through SkillsInvoker. Added `tests/test_skills.py` (22 tests). Full suite: 101/101 passing.
+- 003-mcp-server (Phase 2E): Added `specs/003-mcp-server/spec-2e-agent-skills.md` — 5 skill manifests (CustomerIdentification, SentimentAnalysis, KnowledgeRetrieval, EscalationDecision, ChannelAdaptation). No new code or dependencies.
+- 003-mcp-server: Added Python 3.12 + `mcp>=1.2.0` (FastMCP), `openai>=1.0`, `python-dotenv>=1.0.0`
+- 002-memory-state: Added Python 3.12 + OpenAI (already installed), python-dotenv (already installed) — no new external dependencies
+- 001-incubation-exploration (Phase 2B): Added `openai>=1.0`, `python-dotenv` to requirements.txt. New modules: `src/agent/models.py` (dataclasses), `src/agent/knowledge_base.py` (Jaccard text search), `src/agent/channel_formatter.py` (email/whatsapp/web_form formatting), `src/agent/escalation_evaluator.py` (LLM-intent via gpt-4o-mini), `src/agent/prompts.py` (PKT datetime injection), `src/agent/prototype.py` (core loop + CLI). No new external services — OpenAI only. Prototype uses in-memory state; pgvector and Kafka deferred to Stage 2.
+
+## Active Technologies
+- Python 3.12 + `mcp>=1.2.0` (FastMCP), `openai>=1.0`, `python-dotenv>=1.0.0` (003-mcp-server)
+- In-memory `ConversationStore` singleton (Phase 2C) — no new persistence (003-mcp-server)

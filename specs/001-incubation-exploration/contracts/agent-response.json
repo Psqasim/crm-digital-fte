@@ -1,0 +1,136 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AgentResponse",
+  "description": "Complete output of process_ticket() — the agent's response for a single inbound ticket",
+  "type": "object",
+  "required": [
+    "ticket_id",
+    "channel",
+    "raw_response",
+    "formatted_response",
+    "escalation",
+    "kb_results_used",
+    "processing_time_ms",
+    "model_used",
+    "prompt_datetime"
+  ],
+  "properties": {
+    "ticket_id": {
+      "type": "string",
+      "description": "References NormalizedTicket.ticket_id — same as input TicketMessage.id",
+      "examples": ["TKT-025", "550e8400-e29b-41d4-a716-446655440000"]
+    },
+    "channel": {
+      "type": "string",
+      "enum": ["email", "whatsapp", "web_form"],
+      "description": "Source channel — used for routing the formatted response"
+    },
+    "raw_response": {
+      "type": "string",
+      "minLength": 1,
+      "description": "LLM output before channel-specific formatting is applied. Never empty."
+    },
+    "formatted_response": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Channel-formatted response, ready to send. NEVER null or empty. For escalated tickets, this is the escalation acknowledgment template."
+    },
+    "escalation": {
+      "type": "object",
+      "description": "Always populated — evaluated for every ticket regardless of outcome",
+      "required": ["should_escalate", "reason", "urgency", "raw_llm_response"],
+      "properties": {
+        "should_escalate": {
+          "type": "boolean",
+          "description": "True = human review required; False = AI-resolved"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Human-readable reason code from LLM evaluator",
+          "examples": [
+            "standard_bug_report",
+            "refund_request",
+            "explicit_human_request",
+            "legal_compliance",
+            "extreme_negative_sentiment",
+            "data_breach_concern",
+            "enterprise_sla_risk",
+            "pricing_negotiation"
+          ]
+        },
+        "urgency": {
+          "type": "string",
+          "enum": ["low", "normal", "high"],
+          "description": "Urgency level: high=security/SLA breach, normal=refund/legal/human-request, low=pricing negotiation"
+        },
+        "raw_llm_response": {
+          "type": "string",
+          "description": "Raw JSON string from the gpt-4o-mini escalation call — preserved for debugging and audit"
+        }
+      },
+      "additionalProperties": false
+    },
+    "kb_results_used": {
+      "type": "array",
+      "description": "Knowledge base sections referenced when generating the response. Empty array for escalated tickets.",
+      "items": {
+        "type": "object",
+        "required": ["section_title", "content", "relevance_score"],
+        "properties": {
+          "section_title": {
+            "type": "string",
+            "description": "Section header from product-docs.md",
+            "examples": ["3. Integrations", "2. Task Automation Rules"]
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Section body text, truncated to 500 chars for prompt token budget"
+          },
+          "relevance_score": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "description": "Jaccard similarity score between query words and section words"
+          }
+        },
+        "additionalProperties": false
+      },
+      "maxItems": 3
+    },
+    "processing_time_ms": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Total wall-clock time in milliseconds from ticket receipt to AgentResponse creation"
+    },
+    "model_used": {
+      "type": "string",
+      "description": "OpenAI model used for the main response generation step",
+      "examples": ["gpt-4o", "gpt-4o-mini"]
+    },
+    "prompt_datetime": {
+      "type": "string",
+      "description": "The PKT datetime string that was injected into the system prompt",
+      "examples": ["Tuesday, April 01, 2026 at 04:17 PM PKT"]
+    }
+  },
+  "allOf": [
+    {
+      "description": "Escalated tickets: formatted_response is the escalation acknowledgment (not LLM-generated)",
+      "if": {
+        "properties": {
+          "escalation": {
+            "properties": { "should_escalate": { "const": true } },
+            "required": ["should_escalate"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "kb_results_used": { "maxItems": 0 }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

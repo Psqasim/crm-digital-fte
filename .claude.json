@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "nexaflow-crm": {
+      "command": "python",
+      "args": ["-m", "src.mcp_server.server"],
+      "cwd": "/home/ps_qasim/projects/crm-digital-fte"
+    }
+  }
+}
