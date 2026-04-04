@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain — 1 marker present (see below)
+- [x] No [NEEDS CLARIFICATION] markers remain — resolved: Option B (unified `fte.tickets.incoming`)
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,5 +31,5 @@
 
 ## Notes
 
-- **1 clarification required** (FR-SH-005 / Assumptions §8): Kafka topic routing strategy.
-  See Question 1 below. Resolve before `/sp.plan`.
+- All items pass. Q1 resolved 2026-04-04: both handlers publish to `fte.tickets.incoming`
+  (Option B). Spec is ready for `/sp.plan`.

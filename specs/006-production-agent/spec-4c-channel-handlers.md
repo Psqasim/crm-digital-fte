@@ -26,7 +26,7 @@ the Gmail handler is the most complex due to the two-step Pub/Sub → history.li
 Failure here breaks ticket intake entirely for email.
 
 **Independent Test**: POST a synthetic Pub/Sub notification payload to the webhook endpoint.
-Assert: (a) a TicketMessage record lands on `tickets.email` with `channel="email"`, (b) the
+Assert: (a) a TicketMessage record lands on `fte.tickets.incoming` with `channel="email"`, (b) the
 Gmail API `send` method was called with the correct `threadId`, (c) the webhook returns HTTP 200.
 
 **Acceptance Scenarios**:
@@ -60,7 +60,7 @@ Messages API.
 creates a security gap; missing deduplication creates duplicate tickets. Both are P1 defects.
 
 **Independent Test**: POST a synthetic Twilio webhook payload with a valid `X-Twilio-Signature`
-header to the handler endpoint. Assert: (a) a TicketMessage lands on `tickets.whatsapp` with
+header to the handler endpoint. Assert: (a) a TicketMessage lands on `fte.tickets.incoming` with
 `channel="whatsapp"`, (b) Twilio's `messages.create` was called with the customer's `From`
 number as `to`, (c) the webhook returns HTTP 200.
 
@@ -150,7 +150,8 @@ still returns HTTP 200, the error is logged to stderr, and no exception propagat
 - **FR-GH-004**: The handler MUST normalise each extracted Gmail message into a `TicketMessage`
   with `channel="email"`, populating `id`, `customer_email`, `subject`, `message`, `received_at`,
   and `metadata["thread_id"]`.
-- **FR-GH-005**: The handler MUST publish each `TicketMessage` to the Kafka topic `tickets.email`.
+- **FR-GH-005**: The handler MUST publish each `TicketMessage` to the unified Kafka topic
+  `fte.tickets.incoming` with `channel="email"` set in the payload.
 - **FR-GH-006**: The handler MUST send replies via the Gmail API `messages.send` method, with the
   reply's `threadId` set to the original `threadId` to preserve thread continuity.
 - **FR-GH-007**: The handler MUST deduplicate incoming Gmail messages using the Gmail `message_id`.
@@ -172,7 +173,8 @@ still returns HTTP 200, the error is logged to stderr, and no exception propagat
 - **FR-WH-004**: The handler MUST normalise each WhatsApp message into a `TicketMessage`
   with `channel="whatsapp"`, populating `id`, `customer_phone`, `message`, `received_at`,
   and `metadata["message_sid"]`.
-- **FR-WH-005**: The handler MUST publish each `TicketMessage` to the Kafka topic `tickets.whatsapp`.
+- **FR-WH-005**: The handler MUST publish each `TicketMessage` to the unified Kafka topic
+  `fte.tickets.incoming` with `channel="whatsapp"` set in the payload.
 - **FR-WH-006**: The handler MUST send replies via the Twilio REST API `messages.create` method,
   sending from the configured NexaFlow Twilio WhatsApp number to the customer's `From` number.
 - **FR-WH-007**: The handler MUST deduplicate incoming messages using `MessageSid`. A seen
@@ -256,12 +258,10 @@ still returns HTTP 200, the error is logged to stderr, and no exception propagat
 7. **Customer name** is not available in raw Gmail / WhatsApp payloads. The `customer_name`
    field in TicketMessage is populated as "Valued Customer" until the agent resolves identity
    via `get_or_create_customer`.
-8. **`tickets.email` and `tickets.whatsapp` are the correct Kafka topic names** per the spec
-   (`specs/customer-success-fte-spec.md` §2 and existing `fte.tickets.incoming` queue design).
-   The handlers publish to channel-specific topics that a Kafka consumer bridges to the unified
-   `fte.tickets.incoming` topic — OR publish directly to `fte.tickets.incoming` with channel
-   field set. [NEEDS CLARIFICATION: confirm whether to publish to channel-specific topics or
-   directly to the unified `fte.tickets.incoming` topic — this affects consumer routing design.]
+8. **Both handlers publish directly to `fte.tickets.incoming`**, the single unified Kafka topic
+   defined in `specs/customer-success-fte-spec.md` §2. No channel-specific topic fan-in is
+   needed. The Phase 4E consumer reads one topic and routes by the `channel` field in the
+   TicketMessage payload.
 
 ---
 
