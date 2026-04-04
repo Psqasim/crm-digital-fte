@@ -7,3 +7,12 @@ pytest-asyncio>=0.23.0
 # Phase 4B: OpenAI Agents SDK
 openai-agents>=0.0.1
 pytest-mock>=3.14.0
+# Phase 4C: Channel Handlers
+aiokafka>=0.11
+google-api-python-client>=2.0
+google-auth-oauthlib>=1.0
+google-auth-httplib2>=0.2
+twilio>=9.0
+fastapi>=0.110
+uvicorn>=0.29
+httpx>=0.27

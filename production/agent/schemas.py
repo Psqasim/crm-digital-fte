@@ -79,6 +79,14 @@ class SendResponseInput(BaseModel):
     channel: str = Field(
         description="Delivery channel: 'email', 'whatsapp', or 'web_form'."
     )
+    thread_id: str | None = Field(
+        default=None,
+        description="Gmail threadId for email replies; required when channel=email.",
+    )
+    recipient: str | None = Field(
+        default=None,
+        description="Override recipient; uses ticket customer_email/phone if None.",
+    )
 
 
 class ResolveTicketInput(BaseModel):

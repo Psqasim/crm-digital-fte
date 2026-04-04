@@ -21,6 +21,7 @@ import sys
 import uuid
 from datetime import datetime, timezone
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from agents import function_tool
 from openai import AsyncOpenAI
@@ -253,6 +254,11 @@ async def escalate_to_human(params: EscalateInput) -> str:
 
 
 async def _send_response_impl(params: SendResponseInput) -> str:
+    # Lazy imports inside function body to prevent circular imports
+    # (tools.py → gmail_handler.py → kafka_producer.py → models.py)
+    from production.channels.gmail_handler import GmailHandler
+    from production.channels.whatsapp_handler import WhatsAppHandler
+
     try:
         customer_name = _CUSTOMER_NAMES.get(params.ticket_id, _DEFAULT_CUSTOMER_NAME)
 
@@ -270,22 +276,47 @@ async def _send_response_impl(params: SendResponseInput) -> str:
                 formatting_notes=["unknown_channel_passthrough"],
             )
 
-        # Stub delivery — log for Phase 4C
-        print(
-            f"[STUB] {params.channel}: {formatted.formatted_text[:80]}...",
-            file=sys.stderr,
-        )
+        try:
+            if params.channel == "email":
+                handler = GmailHandler()
+                await handler.setup_credentials()
+                thread_id = params.thread_id or ""
+                recipient = params.recipient or ""
+                await handler.send_reply(
+                    thread_id=thread_id,
+                    to_email=recipient,
+                    body=formatted.formatted_text,
+                )
+            elif params.channel == "whatsapp":
+                handler = WhatsAppHandler()
+                recipient = params.recipient or ""
+                await handler.send_reply(
+                    to_phone=recipient,
+                    body=formatted.formatted_text,
+                )
+            elif params.channel == "web_form":
+                # Phase 4C-iii: FastAPI handles web_form outbound
+                pass
+        except Exception as dispatch_err:
+            print(f"[send_response dispatch ERROR] {dispatch_err}", file=sys.stderr)
+            return json.dumps({
+                "delivery_status": "failed",
+                "error": str(dispatch_err),
+                "channel": params.channel,
+            })
 
         return json.dumps({
-            "delivery_status": "stub_delivered",
-            "ticket_id": params.ticket_id,
+            "delivery_status": "delivered",
             "channel": params.channel,
-            "message_length": len(formatted.formatted_text),
-            "timestamp": _utc_now(),
+            "timestamp": datetime.now(ZoneInfo("Asia/Karachi")).isoformat(),
         })
     except Exception as e:
         print(f"[send_response ERROR] {e}", file=sys.stderr)
-        return json.dumps({"error": str(e), "tool": "send_response"})
+        return json.dumps({
+            "delivery_status": "failed",
+            "error": str(e),
+            "channel": params.channel,
+        })
 
 
 @function_tool
