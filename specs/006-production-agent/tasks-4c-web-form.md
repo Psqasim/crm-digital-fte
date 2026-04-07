@@ -28,7 +28,7 @@
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T002 Apply migration to Neon PostgreSQL: `psql $DATABASE_URL -f production/database/migrations/add_ticket_priority.sql`
+- [X] T002 Apply migration to Neon PostgreSQL: `psql $DATABASE_URL -f production/database/migrations/add_ticket_priority.sql`
   - **File**: Neon PostgreSQL `tickets` table (SCHEMA CHANGE)
   - **Acceptance**: `psql` returns `ALTER TABLE` (not an error); `\d tickets` shows `priority` column with `character varying(20)` type and `'medium'` default
   - **Depends on**: T001
@@ -253,56 +253,56 @@
 
 ### 3A — WebFormHandler Python Backend ⚠️ HIGH RISK
 
-- [ ] T037 Define `WebFormInput` Pydantic v2 model in `production/channels/web_form_handler.py`: `name: str = Field(min_length=1, max_length=200)`, `email: EmailStr`, `subject: str = Field(min_length=5, max_length=200)`, `category: Literal["billing", "technical", "account", "general"]`, `priority: Literal["low", "medium", "high", "urgent"]`, `message: str = Field(min_length=20, max_length=2000)`
+- [X] T0\1 Define `WebFormInput` Pydantic v2 model in `production/channels/web_form_handler.py`: `name: str = Field(min_length=1, max_length=200)`, `email: EmailStr`, `subject: str = Field(min_length=5, max_length=200)`, `category: Literal["billing", "technical", "account", "general"]`, `priority: Literal["low", "medium", "high", "urgent"]`, `message: str = Field(min_length=20, max_length=2000)`
   - **File**: `production/channels/web_form_handler.py` (REPLACE stub)
   - **Acceptance**: Model imports `BaseModel`, `Field`, `EmailStr`, `Literal` from correct Pydantic v2 paths; invalid email raises `ValidationError`; message < 20 chars raises `ValidationError`; unknown category raises `ValidationError`
   - **Depends on**: T036
   - **Test needed**: No
   - **HIGH RISK**: Yes
 
-- [ ] T038 [US1] ⚠️ HIGH RISK — Subtask A: Implement `get_or_create_customer` step in `submit_ticket(pool, body: WebFormInput)` — call `await queries.get_or_create_customer(pool, email=body.email, name=body.name)`; if raises exception → log to stderr and re-raise (outer try/except handles rollback)
+- [X] T038 [US1] ⚠️ HIGH RISK — Subtask A: Implement `get_or_create_customer` step in `submit_ticket(pool, body: WebFormInput)` — call `await queries.get_or_create_customer(pool, email=body.email, name=body.name)`; if raises exception → log to stderr and re-raise (outer try/except handles rollback)
   - **File**: `production/channels/web_form_handler.py` (UPDATE)
   - **Acceptance**: Step 1 uses existing `queries.get_or_create_customer()`; returns `customer` dict with `id` key; on DB error re-raises (does NOT swallow); no orphaned records created yet at this step
   - **Depends on**: T037
   - **Test needed**: No
   - **HIGH RISK**: Yes
 
-- [ ] T039 [US1] ⚠️ HIGH RISK — Subtask B: Implement `create_conversation` step in `submit_ticket()` — call `await queries.create_conversation(pool, customer_id=customer['id'], channel="web_form")`; returns `conv_id`
+- [X] T039 [US1] ⚠️ HIGH RISK — Subtask B: Implement `create_conversation` step in `submit_ticket()` — call `await queries.create_conversation(pool, customer_id=customer['id'], channel="web_form")`; returns `conv_id`
   - **File**: `production/channels/web_form_handler.py` (UPDATE)
   - **Acceptance**: `channel="web_form"` hardcoded (not passed from body); `conv_id` used in subsequent steps; on failure re-raises for outer catch
   - **Depends on**: T038
   - **Test needed**: No
   - **HIGH RISK**: Yes
 
-- [ ] T040 [US1] ⚠️ HIGH RISK — Subtask C: Implement `add_message` step in `submit_ticket()` — call `await queries.add_message(pool, conv_id, role="customer", content=body.message, channel="web_form")`; returns `msg_id`
+- [X] T040 [US1] ⚠️ HIGH RISK — Subtask C: Implement `add_message` step in `submit_ticket()` — call `await queries.add_message(pool, conv_id, role="customer", content=body.message, channel="web_form")`; returns `msg_id`
   - **File**: `production/channels/web_form_handler.py` (UPDATE)
   - **Acceptance**: `role="customer"` set; `content=body.message`; `channel="web_form"`; `msg_id` captured (used for audit); on failure re-raises
   - **Depends on**: T039
   - **Test needed**: No
   - **HIGH RISK**: Yes
 
-- [ ] T041 [US1] ⚠️ HIGH RISK — Subtask D: Implement `create_ticket` step in `submit_ticket()` — call `await queries.create_ticket(pool, conv_id, customer['id'], channel="web_form", subject=body.subject, category=body.category, priority=body.priority)`; returns `ticket_id_uuid` (UUID string)
+- [X] T041 [US1] ⚠️ HIGH RISK — Subtask D: Implement `create_ticket` step in `submit_ticket()` — call `await queries.create_ticket(pool, conv_id, customer['id'], channel="web_form", subject=body.subject, category=body.category, priority=body.priority)`; returns `ticket_id_uuid` (UUID string)
   - **File**: `production/channels/web_form_handler.py` (UPDATE)
   - **Acceptance**: All 7 args passed including `priority=body.priority`; `ticket_id_uuid` is a UUID string (not display ID); on failure re-raises; if this step fails, conversation + message are orphaned (logged, acceptable per plan — no delete rollback needed)
   - **Depends on**: T040, T003
   - **Test needed**: No
   - **HIGH RISK**: Yes
 
-- [ ] T042 [US1] ⚠️ HIGH RISK — Subtask E: Publish to Kafka in `submit_ticket()` — build `TicketMessage(id=str(uuid4()), channel="web_form", customer_email=body.email, customer_name=body.name, subject=body.subject, message=body.message, received_at=datetime.now(ZoneInfo("Asia/Karachi")).isoformat(), metadata={})` then `await kafka_producer.publish_ticket(ticket_message)`; on Kafka failure: `print(f"[kafka_error] {e}", file=sys.stderr)` and do NOT re-raise (ticket already in DB — Kafka is best-effort)
+- [X] T042 [US1] ⚠️ HIGH RISK — Subtask E: Publish to Kafka in `submit_ticket()` — build `TicketMessage(id=str(uuid4()), channel="web_form", customer_email=body.email, customer_name=body.name, subject=body.subject, message=body.message, received_at=datetime.now(ZoneInfo("Asia/Karachi")).isoformat(), metadata={})` then `await kafka_producer.publish_ticket(ticket_message)`; on Kafka failure: `print(f"[kafka_error] {e}", file=sys.stderr)` and do NOT re-raise (ticket already in DB — Kafka is best-effort)
   - **File**: `production/channels/web_form_handler.py` (UPDATE)
   - **Acceptance**: `received_at` uses `datetime.now(ZoneInfo("Asia/Karachi"))` (never guess date); Kafka failure does NOT raise — ticket ID still returned; topic is `"fte.tickets.incoming"`; `channel="web_form"` on TicketMessage
   - **Depends on**: T041
   - **Test needed**: No
   - **HIGH RISK**: Yes
 
-- [ ] T043 [US1] ⚠️ HIGH RISK — Subtask F: Return `ticket_id + estimated_response_time` from `submit_ticket()` — return `{ "ticket_id": "TKT-" + ticket_id_uuid[:8].upper(), "internal_id": ticket_id_uuid, "status": "open", "created_at": datetime.now(ZoneInfo("Asia/Karachi")).isoformat(), "estimated_response_time": "~4 hours" }`
+- [X] T043 [US1] ⚠️ HIGH RISK — Subtask F: Return `ticket_id + estimated_response_time` from `submit_ticket()` — return `{ "ticket_id": "TKT-" + ticket_id_uuid[:8].upper(), "internal_id": ticket_id_uuid, "status": "open", "created_at": datetime.now(ZoneInfo("Asia/Karachi")).isoformat(), "estimated_response_time": "~4 hours" }`
   - **File**: `production/channels/web_form_handler.py` (UPDATE)
   - **Acceptance**: Display ID format is exactly `"TKT-" + first_8_chars_uppercase`; `status` is `"open"`; `estimated_response_time` is present; dict returned (not None) on full success
   - **Depends on**: T042
   - **Test needed**: No
   - **HIGH RISK**: Yes
 
-- [ ] T044 [US1] ⚠️ HIGH RISK — Wrap entire `submit_ticket()` body in `try/except Exception as e`: on exception `print(f"[web_form_error] {e}", file=sys.stderr)` and `return None`; rollback note: DB has no explicit transaction rollback — orphaned records are acceptable per plan; only ticket creation failure is critical (returns None → 500)
+- [X] T044 [US1] ⚠️ HIGH RISK — Wrap entire `submit_ticket()` body in `try/except Exception as e`: on exception `print(f"[web_form_error] {e}", file=sys.stderr)` and `return None`; rollback note: DB has no explicit transaction rollback — orphaned records are acceptable per plan; only ticket creation failure is critical (returns None → 500)
   - **File**: `production/channels/web_form_handler.py` (UPDATE)
   - **Acceptance**: Any exception in steps A–F causes function to return `None` (not raise); error logged to stderr with prefix `[web_form_error]`; partial DB records (customer, conv, message without ticket) are accepted orphans; complete function is inside the try block
   - **Depends on**: T043
@@ -311,35 +311,35 @@
 
 ### 3B — FastAPI Web Form Router
 
-- [ ] T045 [US1] Create `production/api/web_form_routes.py` with `router = APIRouter()` — no prefix on router (paths registered on router directly to produce clean `/support/submit` etc.)
+- [X] T045 [US1] Create `production/api/web_form_routes.py` with `router = APIRouter()` — no prefix on router (paths registered on router directly to produce clean `/support/submit` etc.)
   - **File**: `production/api/web_form_routes.py` (NEW)
   - **Acceptance**: `from fastapi import APIRouter`; `router = APIRouter()`; file importable without error; `WebFormInput` imported from `production.channels.web_form_handler`
   - **Depends on**: T037
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T046 [US1] Implement `POST /support/submit` in `web_form_routes.py`: validate body as `WebFormInput` (FastAPI auto-validates; 422 on schema failure); call `web_form_handler.submit_ticket(pool, body)`; return `JSONResponse(result, status_code=201)` on success; return `JSONResponse({"detail": "Internal server error"}, status_code=500)` when result is `None`
+- [X] T046 [US1] Implement `POST /support/submit` in `web_form_routes.py`: validate body as `WebFormInput` (FastAPI auto-validates; 422 on schema failure); call `web_form_handler.submit_ticket(pool, body)`; return `JSONResponse(result, status_code=201)` on success; return `JSONResponse({"detail": "Internal server error"}, status_code=500)` when result is `None`
   - **File**: `production/api/web_form_routes.py` (UPDATE)
   - **Acceptance**: `@router.post("/support/submit")`; invalid body → 422 (automatic); `submit_ticket` returns None → 500 with `{"detail": "Internal server error"}`; success → 201 with full result dict
   - **Depends on**: T045, T044
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T047 [US1] Implement `GET /support/ticket/{ticket_id}` in `web_form_routes.py`: call `queries.get_ticket_by_display_id(pool, ticket_id)`; return 200 with ticket dict on success; return `JSONResponse({"detail": "Ticket not found"}, status_code=404)` when None
+- [X] T047 [US1] Implement `GET /support/ticket/{ticket_id}` in `web_form_routes.py`: call `queries.get_ticket_by_display_id(pool, ticket_id)`; return 200 with ticket dict on success; return `JSONResponse({"detail": "Ticket not found"}, status_code=404)` when None
   - **File**: `production/api/web_form_routes.py` (UPDATE)
   - **Acceptance**: `@router.get("/support/ticket/{ticket_id}")`; valid TKT-XXXXXX → 200; unknown ID → 404 with `{"detail": "Ticket not found"}`; no 500 for normal not-found case
   - **Depends on**: T045, T005
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T048 [US1] Implement `GET /metrics/summary` in `web_form_routes.py`: call `queries.get_metrics_summary(pool)`; return 200 with metrics dict; set `Cache-Control: no-store` response header
+- [X] T048 [US1] Implement `GET /metrics/summary` in `web_form_routes.py`: call `queries.get_metrics_summary(pool)`; return 200 with metrics dict; set `Cache-Control: no-store` response header
   - **File**: `production/api/web_form_routes.py` (UPDATE)
   - **Acceptance**: `@router.get("/metrics/summary")`; returns 200 with full metrics dict; `Cache-Control: no-store` header present on response
   - **Depends on**: T045, T006
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T049 [US1] Register web form router in `production/api/main.py`: add `from production.api.web_form_routes import router as web_form_router` and `app.include_router(web_form_router)`
+- [X] T049 [US1] Register web form router in `production/api/main.py`: add `from production.api.web_form_routes import router as web_form_router` and `app.include_router(web_form_router)`
   - **File**: `production/api/main.py` (UPDATE)
   - **Acceptance**: Import line present; `app.include_router(web_form_router)` added after existing router registrations; existing `/webhooks/gmail` and `/webhooks/whatsapp` routes still accessible (no prefix collision); `uvicorn` starts without error
   - **Depends on**: T045
@@ -348,7 +348,7 @@
 
 ### 3C — Next.js POST Proxy Route
 
-- [ ] T050 [US1] Create `src/web-form/app/api/tickets/route.ts` — `POST` handler: parse request body as JSON; `fetch(\`${process.env.FASTAPI_URL}/support/submit\`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })`; pass through status + body via `return NextResponse.json(data, { status: res.status })`; catch network error → return `NextResponse.json({ detail: "Service unavailable" }, { status: 503 })`; add `export const dynamic = 'force-dynamic'`
+- [X] T050 [US1] Create `src/web-form/app/api/tickets/route.ts` — `POST` handler: parse request body as JSON; `fetch(\`${process.env.FASTAPI_URL}/support/submit\`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })`; pass through status + body via `return NextResponse.json(data, { status: res.status })`; catch network error → return `NextResponse.json({ detail: "Service unavailable" }, { status: 503 })`; add `export const dynamic = 'force-dynamic'`
   - **File**: `src/web-form/app/api/tickets/route.ts` (NEW)
   - **Acceptance**: File exports `POST` function and `dynamic = 'force-dynamic'`; FastAPI 201 → proxied 201; FastAPI 422 → proxied 422 (error detail preserved, not swallowed); network failure → 503; `FASTAPI_URL` from `process.env` (server-side only, not prefixed `NEXT_PUBLIC_`)
   - **Depends on**: T019, T049
@@ -357,70 +357,70 @@
 
 ### 3D — Support Form Page ⚠️ HIGH RISK
 
-- [ ] T051 [US1] Create `src/web-form/app/support/page.tsx` — Server Component; static metadata export: `title: "Submit a Support Ticket | NexaFlow"`, `description`, `og:title`, `og:description`; renders `<SupportForm />` client component below a heading `"Get Support"` with subheading
+- [X] T051 [US1] Create `src/web-form/app/support/page.tsx` — Server Component; static metadata export: `title: "Submit a Support Ticket | NexaFlow"`, `description`, `og:title`, `og:description`; renders `<SupportForm />` client component below a heading `"Get Support"` with subheading
   - **File**: `src/web-form/app/support/page.tsx` (NEW)
   - **Acceptance**: `export const metadata`; no `'use client'`; imports `SupportForm` from `"./SupportForm"`; page title in browser tab reads "Submit a Support Ticket | NexaFlow"
   - **Depends on**: T009, T017
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T052 [US1] ⚠️ HIGH RISK — Subtask A: Define Zod schema in `src/web-form/app/support/SupportForm.tsx` (new file): `formSchema = z.object({ name: z.string().min(1, 'Name is required'), email: z.string().email('Enter a valid email'), subject: z.string().min(5, 'Subject must be at least 5 characters'), category: z.enum(['billing', 'technical', 'account', 'general'], { required_error: 'Category is required' }), priority: z.enum(['low', 'medium', 'high', 'urgent'], { required_error: 'Priority is required' }), message: z.string().min(20, 'Message must be at least 20 characters').max(2000, 'Message cannot exceed 2000 characters') })`
+- [X] T052 [US1] ⚠️ HIGH RISK — Subtask A: Define Zod schema in `src/web-form/app/support/SupportForm.tsx` (new file): `formSchema = z.object({ name: z.string().min(1, 'Name is required'), email: z.string().email('Enter a valid email'), subject: z.string().min(5, 'Subject must be at least 5 characters'), category: z.enum(['billing', 'technical', 'account', 'general'], { required_error: 'Category is required' }), priority: z.enum(['low', 'medium', 'high', 'urgent'], { required_error: 'Priority is required' }), message: z.string().min(20, 'Message must be at least 20 characters').max(2000, 'Message cannot exceed 2000 characters') })`
   - **File**: `src/web-form/app/support/SupportForm.tsx` (NEW)
   - **Acceptance**: `'use client'` directive at top; schema exported as `formSchema`; `z.string().email()` rejects `"not-an-email"`; `message` with 19 chars fails `.min(20)`; `message` with 2001 chars fails `.max(2000)`; `category` with value `"other"` fails `.enum()`
   - **Depends on**: T008, T009
   - **Test needed**: No
   - **HIGH RISK**: Yes
 
-- [ ] T053 [US1] ⚠️ HIGH RISK — Subtask B: Set up `useForm` with `zodResolver` in `SupportForm.tsx`: `const form = useForm<z.infer<typeof formSchema>>({ resolver: zodResolver(formSchema), defaultValues: { name: '', email: '', subject: '', category: undefined, priority: undefined, message: '' } })`
+- [X] T053 [US1] ⚠️ HIGH RISK — Subtask B: Set up `useForm` with `zodResolver` in `SupportForm.tsx`: `const form = useForm<z.infer<typeof formSchema>>({ resolver: zodResolver(formSchema), defaultValues: { name: '', email: '', subject: '', category: undefined, priority: undefined, message: '' } })`
   - **File**: `src/web-form/app/support/SupportForm.tsx` (UPDATE)
   - **Acceptance**: `useForm` imported from `react-hook-form`; `zodResolver` imported from `@hookform/resolvers/zod`; `defaultValues` includes all 6 fields; form state `isDirty` starts as false; validation only triggers on submit (not on every keystroke)
   - **Depends on**: T052
   - **Test needed**: No
   - **HIGH RISK**: Yes
 
-- [ ] T054 [US1] ⚠️ HIGH RISK — Subtask C: Build form UI in `SupportForm.tsx`: shadcn `<Form>` wraps all content; 6 fields each use `<FormField control={form.control} name="...">` → `<FormItem>` → `<FormLabel>` → `<FormControl>` → appropriate input → `<FormMessage>`; Name: `<Input>`; Email: `<Input type="email">`; Subject: `<Input>`; Category: `<Select>` with 4 options; Priority: `<Select>` with 4 options; Message: `<Textarea rows={5}`; dark theme: `bg-slate-900/50 border-slate-700` on form card
+- [X] T054 [US1] ⚠️ HIGH RISK — Subtask C: Build form UI in `SupportForm.tsx`: shadcn `<Form>` wraps all content; 6 fields each use `<FormField control={form.control} name="...">` → `<FormItem>` → `<FormLabel>` → `<FormControl>` → appropriate input → `<FormMessage>`; Name: `<Input>`; Email: `<Input type="email">`; Subject: `<Input>`; Category: `<Select>` with 4 options; Priority: `<Select>` with 4 options; Message: `<Textarea rows={5}`; dark theme: `bg-slate-900/50 border-slate-700` on form card
   - **File**: `src/web-form/app/support/SupportForm.tsx` (UPDATE)
   - **Acceptance**: All 6 `<FormLabel>` components present; all 6 `<FormMessage>` components present (they show error text automatically via RHF); Category/Priority each have all 4 options; empty submit shows validation errors on all required fields without a network request
   - **Depends on**: T053
   - **Test needed**: No
   - **HIGH RISK**: Yes
 
-- [ ] T055 [US1] Add live character counter to Message `<Textarea>`: `const messageLength = form.watch('message').length`; display `{messageLength}/2000` below textarea; apply `text-red-400 font-medium` when `messageLength >= 1800`
+- [X] T055 [US1] Add live character counter to Message `<Textarea>`: `const messageLength = form.watch('message').length`; display `{messageLength}/2000` below textarea; apply `text-red-400 font-medium` when `messageLength >= 1800`
   - **File**: `src/web-form/app/support/SupportForm.tsx` (UPDATE)
   - **Acceptance**: Counter updates on every keystroke; counter turns red at 1800 chars; counter shows `0/2000` on empty form; counter resets after successful submission
   - **Depends on**: T054
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T056 [US1] ⚠️ HIGH RISK — Subtask D: Implement optimistic submit handler in `SupportForm.tsx`: `form.handleSubmit(async (data) => { setSubmitting(true); const res = await fetch('/api/tickets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const json = await res.json(); if (res.ok) { /* success path */ } else { toast.error(json.detail || 'Submission failed'); setSubmitting(false); } })`; on success: show confetti (T057) + toast with ticket ID + `router.push('/ticket/' + ticketId)` after 2 seconds
+- [X] T056 [US1] ⚠️ HIGH RISK — Subtask D: Implement optimistic submit handler in `SupportForm.tsx`: `form.handleSubmit(async (data) => { setSubmitting(true); const res = await fetch('/api/tickets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const json = await res.json(); if (res.ok) { /* success path */ } else { toast.error(json.detail || 'Submission failed'); setSubmitting(false); } })`; on success: show confetti (T057) + toast with ticket ID + `router.push('/ticket/' + ticketId)` after 2 seconds
   - **File**: `src/web-form/app/support/SupportForm.tsx` (UPDATE)
   - **Acceptance**: `setSubmitting(true)` called before `fetch`; on 201 response `setSubmitting` stays true (navigating away); on any error `setSubmitting(false)` called before returning; form field values NOT cleared on error (zero data loss); `useRouter` imported from `next/navigation`
   - **Depends on**: T054, T050
   - **Test needed**: No
   - **HIGH RISK**: Yes
 
-- [ ] T057 [US1] ⚠️ HIGH RISK — Subtask E: Add canvas-confetti trigger in `SupportForm.tsx`: `import confetti from 'canvas-confetti'`; on success call `confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 }, colors: ['#3B82F6', '#2563EB', '#60A5FA', '#FFFFFF'] })`; guard with `confettiFired` ref to ensure fires exactly once per submission: `const confettiFired = useRef(false)` → set to true after firing → reset on new submission attempt
+- [X] T057 [US1] ⚠️ HIGH RISK — Subtask E: Add canvas-confetti trigger in `SupportForm.tsx`: `import confetti from 'canvas-confetti'`; on success call `confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 }, colors: ['#3B82F6', '#2563EB', '#60A5FA', '#FFFFFF'] })`; guard with `confettiFired` ref to ensure fires exactly once per submission: `const confettiFired = useRef(false)` → set to true after firing → reset on new submission attempt
   - **File**: `src/web-form/app/support/SupportForm.tsx` (UPDATE)
   - **Acceptance**: Confetti fires exactly once on success (not on page revisit or refresh); colors include NexaFlow blue `#3B82F6`; duration approx 2 seconds; `confettiFired.current` reset to false when submit button is re-enabled for retry
   - **Depends on**: T056
   - **Test needed**: No
   - **HIGH RISK**: Yes
 
-- [ ] T058 [US1] Add disabled submit button state in `SupportForm.tsx`: `<Button type="submit" disabled={submitting}>{submitting ? 'Submitting...' : 'Submit Ticket'}</Button>`; button is `w-full` on mobile
+- [X] T058 [US1] Add disabled submit button state in `SupportForm.tsx`: `<Button type="submit" disabled={submitting}>{submitting ? 'Submitting...' : 'Submit Ticket'}</Button>`; button is `w-full` on mobile
   - **File**: `src/web-form/app/support/SupportForm.tsx` (UPDATE)
   - **Acceptance**: Button shows "Submitting..." when `submitting === true`; button `disabled` attribute prevents double-click; button re-enables after error (when `setSubmitting(false)` called)
   - **Depends on**: T056
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T059 [US1] ⚠️ HIGH RISK — Subtask F: Add Framer Motion entrance animations to support form: wrap form card in `<SlideUp delay={0.1}>` and page heading in `<FadeIn delay={0}>` — import animation components from `@/components/animations`
+- [X] T059 [US1] ⚠️ HIGH RISK — Subtask F: Add Framer Motion entrance animations to support form: wrap form card in `<SlideUp delay={0.1}>` and page heading in `<FadeIn delay={0}>` — import animation components from `@/components/animations`
   - **File**: `src/web-form/app/support/SupportForm.tsx` (UPDATE), `src/web-form/app/support/page.tsx` (UPDATE)
   - **Acceptance**: Form card slides up 24px into view on page load; heading fades in; animations complete within 600ms; with `prefers-reduced-motion` system setting enabled, form renders instantly (no animation)
   - **Depends on**: T027, T028, T054
   - **Test needed**: No
   - **HIGH RISK**: Yes
 
-- [ ] T060 [US1] Add accessibility attributes to `SupportForm.tsx`: all `<FormLabel>` have implicit `htmlFor` via shadcn; add `aria-describedby` to each input pointing to `<FormMessage>` ID; verify Tab order matches visual top-to-bottom field order
+- [X] T060 [US1] Add accessibility attributes to `SupportForm.tsx`: all `<FormLabel>` have implicit `htmlFor` via shadcn; add `aria-describedby` to each input pointing to `<FormMessage>` ID; verify Tab order matches visual top-to-bottom field order
   - **File**: `src/web-form/app/support/SupportForm.tsx` (UPDATE)
   - **Acceptance**: Each `<Input>`/`<Textarea>`/`<Select>` has `aria-describedby` matching its `<FormMessage>` element id; Tab key moves Name → Email → Subject → Category → Priority → Message → Submit in order; Enter key on submit button submits the form
   - **Depends on**: T054
@@ -439,7 +439,7 @@
 
 ### 4A — Next.js GET Ticket Proxy Route
 
-- [ ] T061 [US2] Create `src/web-form/app/api/tickets/[id]/route.ts` — `GET` handler: `const { id } = await params`; `fetch(\`${process.env.FASTAPI_URL}/support/ticket/${id}\`)`; pass through status + body; on network error → 503
+- [X] T061 [US2] Create `src/web-form/app/api/tickets/[id]/route.ts` — `GET` handler: `const { id } = await params`; `fetch(\`${process.env.FASTAPI_URL}/support/ticket/${id}\`)`; pass through status + body; on network error → 503
   - **File**: `src/web-form/app/api/tickets/[id]/route.ts` (NEW)
   - **Acceptance**: File exports `GET` function; valid ticket ID → proxied 200 with full ticket dict; unknown ID → proxied 404; network failure → 503; `export const dynamic = 'force-dynamic'`
   - **Depends on**: T019, T049
@@ -448,70 +448,70 @@
 
 ### 4B — Ticket Status Page ⚠️ HIGH RISK
 
-- [ ] T062 [US2] Create `src/web-form/app/ticket/[id]/page.tsx` — Server Component; `generateMetadata({ params }: { params: Promise<{ id: string }> })`: await params, fetch ticket by ID, return `title: "Ticket ${id} | NexaFlow Support"`, `description: "Track your support ticket status"`; if ticket not found call `notFound()` from `next/navigation`
+- [X] T062 [US2] Create `src/web-form/app/ticket/[id]/page.tsx` — Server Component; `generateMetadata({ params }: { params: Promise<{ id: string }> })`: await params, fetch ticket by ID, return `title: "Ticket ${id} | NexaFlow Support"`, `description: "Track your support ticket status"`; if ticket not found call `notFound()` from `next/navigation`
   - **File**: `src/web-form/app/ticket/[id]/page.tsx` (NEW)
   - **Acceptance**: `export async function generateMetadata` present; `params` awaited (Next.js 15 pattern); valid ticket ID → correct `<title>` in `<head>`; invalid ticket ID → `notFound()` called → not-found.tsx renders
   - **Depends on**: T061, T021
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T063 [US2] Implement initial server-side data fetch in `src/web-form/app/ticket/[id]/page.tsx`: fetch `\`${process.env.FASTAPI_URL}/support/ticket/${params.id}\``; parse JSON; pass as `initialData` prop to `<TicketStatus initialData={ticket} ticketId={params.id} />`; if 404 call `notFound()`
+- [X] T063 [US2] Implement initial server-side data fetch in `src/web-form/app/ticket/[id]/page.tsx`: fetch `\`${process.env.FASTAPI_URL}/support/ticket/${params.id}\``; parse JSON; pass as `initialData` prop to `<TicketStatus initialData={ticket} ticketId={params.id} />`; if 404 call `notFound()`
   - **File**: `src/web-form/app/ticket/[id]/page.tsx` (UPDATE)
   - **Acceptance**: Initial data passed as prop (avoids loading flash on first render); `notFound()` called for 404 before any client hydration; `<TicketStatus>` receives typed `TicketData` prop
   - **Depends on**: T062
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T064 [US2] Create `src/web-form/app/ticket/[id]/TicketStatus.tsx` — Client Component (`'use client'`); `useState<TicketData>(initialData)` for ticket; `useState(false)` for `loading`
+- [X] T064 [US2] Create `src/web-form/app/ticket/[id]/TicketStatus.tsx` — Client Component (`'use client'`); `useState<TicketData>(initialData)` for ticket; `useState(false)` for `loading`
   - **File**: `src/web-form/app/ticket/[id]/TicketStatus.tsx` (NEW)
   - **Acceptance**: `'use client'` directive present; `initialData` prop typed as `TicketData`; state initialized from prop (no undefined flash); no `useEffect` yet (added in T065)
   - **Depends on**: T021
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T065 [US2] ⚠️ HIGH RISK — Subtask A: Add `useEffect` polling in `TicketStatus.tsx`: `useEffect(() => { const id = setInterval(fetchTicket, 5000); return () => clearInterval(id); }, [ticket.status])` — `fetchTicket` calls `GET /api/tickets/${ticketId}` and calls `setTicket(json)` on success
+- [X] T065 [US2] ⚠️ HIGH RISK — Subtask A: Add `useEffect` polling in `TicketStatus.tsx`: `useEffect(() => { const id = setInterval(fetchTicket, 5000); return () => clearInterval(id); }, [ticket.status])` — `fetchTicket` calls `GET /api/tickets/${ticketId}` and calls `setTicket(json)` on success
   - **File**: `src/web-form/app/ticket/[id]/TicketStatus.tsx` (UPDATE)
   - **Acceptance**: `setInterval` fires every 5000ms; dependency array includes `ticket.status`; Network tab shows GET `/api/tickets/[id]` requests every ~5 seconds; status badge updates when server status changes without full page reload
   - **Depends on**: T064, T061
   - **Test needed**: No
   - **HIGH RISK**: Yes
 
-- [ ] T066 [US2] ⚠️ HIGH RISK — Subtask B: Add cleanup on unmount in `TicketStatus.tsx` — `useEffect` cleanup function `return () => clearInterval(intervalId)` must be called even if component unmounts mid-poll
+- [X] T066 [US2] ⚠️ HIGH RISK — Subtask B: Add cleanup on unmount in `TicketStatus.tsx` — `useEffect` cleanup function `return () => clearInterval(intervalId)` must be called even if component unmounts mid-poll
   - **File**: `src/web-form/app/ticket/[id]/TicketStatus.tsx` (UPDATE)
   - **Acceptance**: Navigating away from `/ticket/[id]` stops the interval; browser console shows no "Warning: Can't perform a React state update on an unmounted component" message; interval ID captured in closure and cleared in cleanup function
   - **Depends on**: T065
   - **Test needed**: No
   - **HIGH RISK**: Yes
 
-- [ ] T067 [US2] ⚠️ HIGH RISK — Subtask C: Stop polling when status is terminal in `TicketStatus.tsx` — inside `fetchTicket` after `setTicket(json)`: `if (json.status === 'resolved' || json.status === 'escalated') clearInterval(intervalId)` — also guard at interval start: if `ticket.status` is already terminal, don't start interval
+- [X] T067 [US2] ⚠️ HIGH RISK — Subtask C: Stop polling when status is terminal in `TicketStatus.tsx` — inside `fetchTicket` after `setTicket(json)`: `if (json.status === 'resolved' || json.status === 'escalated') clearInterval(intervalId)` — also guard at interval start: if `ticket.status` is already terminal, don't start interval
   - **File**: `src/web-form/app/ticket/[id]/TicketStatus.tsx` (UPDATE)
   - **Acceptance**: After status becomes "resolved": no further GET `/api/tickets/[id]` requests in Network tab; console logs no interval errors; already-resolved ticket on page load starts no interval at all
   - **Depends on**: T066
   - **Test needed**: No
   - **HIGH RISK**: Yes
 
-- [ ] T068 [US2] ⚠️ HIGH RISK — Subtask D: Add typing indicator in `TicketStatus.tsx` — when `ticket.status === 'open' || ticket.status === 'in_progress'` render: `<div className="flex items-center gap-2 text-slate-400">"AI is analyzing your ticket..." <span className="flex gap-1">{[0,1,2].map(i => <span key={i} className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: \`${i * 0.2}s\` }} />)}</span></div>`
+- [X] T068 [US2] ⚠️ HIGH RISK — Subtask D: Add typing indicator in `TicketStatus.tsx` — when `ticket.status === 'open' || ticket.status === 'in_progress'` render: `<div className="flex items-center gap-2 text-slate-400">"AI is analyzing your ticket..." <span className="flex gap-1">{[0,1,2].map(i => <span key={i} className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: \`${i * 0.2}s\` }} />)}</span></div>`
   - **File**: `src/web-form/app/ticket/[id]/TicketStatus.tsx` (UPDATE)
   - **Acceptance**: Typing indicator visible when status is open or in_progress; 3 dots bounce with staggered animation (0s, 0.2s, 0.4s delay); indicator hidden when status is resolved or escalated; no layout shift when indicator appears/disappears
   - **Depends on**: T067
   - **Test needed**: No
   - **HIGH RISK**: Yes
 
-- [ ] T069 [US2] ⚠️ HIGH RISK — Subtask E: Add skeleton loader on initial load in `TicketStatus.tsx` — use `initialData` prop to skip skeleton on SSR (data already loaded); if `initialData` is null/undefined show `<TicketStatusSkeleton />` until first fetch resolves
+- [X] T069 [US2] ⚠️ HIGH RISK — Subtask E: Add skeleton loader on initial load in `TicketStatus.tsx` — use `initialData` prop to skip skeleton on SSR (data already loaded); if `initialData` is null/undefined show `<TicketStatusSkeleton />` until first fetch resolves
   - **File**: `src/web-form/app/ticket/[id]/TicketStatus.tsx` (UPDATE)
   - **Acceptance**: When accessing page with valid ID from server-side data → no skeleton (immediate render); if somehow `initialData` is missing → skeleton shows; skeleton has correct dimensions matching real content layout (uses `TicketStatusSkeleton` from T026)
   - **Depends on**: T026, T064
   - **Test needed**: No
   - **HIGH RISK**: Yes
 
-- [ ] T070 [US2] Add full ticket display to `TicketStatus.tsx`: Ticket ID in `font-mono text-lg`; `<StatusBadge status={ticket.status} />`; Category and Priority as `<Badge>` pills; Created time formatted as `"Apr 5, 2026 at 10:30 AM PKT"` using `Intl.DateTimeFormat`; original message in `<pre className="whitespace-pre-wrap font-sans bg-slate-800 p-4 rounded">` box
+- [X] T070 [US2] Add full ticket display to `TicketStatus.tsx`: Ticket ID in `font-mono text-lg`; `<StatusBadge status={ticket.status} />`; Category and Priority as `<Badge>` pills; Created time formatted as `"Apr 5, 2026 at 10:30 AM PKT"` using `Intl.DateTimeFormat`; original message in `<pre className="whitespace-pre-wrap font-sans bg-slate-800 p-4 rounded">` box
   - **File**: `src/web-form/app/ticket/[id]/TicketStatus.tsx` (UPDATE)
   - **Acceptance**: All 6 data fields render; timestamp shows PKT timezone; monospace ticket ID; message wraps correctly (no horizontal overflow); `<StatusBadge>` shows correct color per status
   - **Depends on**: T025, T068
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T071 [US2] ⚠️ HIGH RISK — Subtask F: Create `src/web-form/app/ticket/[id]/not-found.tsx` — "Ticket not found" h1 heading, "The ticket you're looking for doesn't exist or has been removed." text, `<Link href="/support">Submit a new ticket →</Link>` button
+- [X] T071 [US2] ⚠️ HIGH RISK — Subtask F: Create `src/web-form/app/ticket/[id]/not-found.tsx` — "Ticket not found" h1 heading, "The ticket you're looking for doesn't exist or has been removed." text, `<Link href="/support">Submit a new ticket →</Link>` button
   - **File**: `src/web-form/app/ticket/[id]/not-found.tsx` (NEW)
   - **Acceptance**: Visiting `/ticket/invalid-id-that-does-not-exist` renders this component (not a crash or blank page); Link navigates to `/support`; no `'use client'` required (Server Component); heading + description visible
   - **Depends on**: T062
@@ -530,7 +530,7 @@
 
 ### 5A — Metrics Proxy Route
 
-- [ ] T072 [US3] Create `src/web-form/app/api/metrics/route.ts` — `GET` handler: `fetch(\`${process.env.FASTAPI_URL}/metrics/summary\`)`; pass through status + body; set `Cache-Control: no-store` header; on network error → 503
+- [X] T072 [US3] Create `src/web-form/app/api/metrics/route.ts` — `GET` handler: `fetch(\`${process.env.FASTAPI_URL}/metrics/summary\`)`; pass through status + body; set `Cache-Control: no-store` header; on network error → 503
   - **File**: `src/web-form/app/api/metrics/route.ts` (NEW)
   - **Acceptance**: File exports `GET` function; `Cache-Control: no-store` set via `NextResponse` headers; `export const dynamic = 'force-dynamic'`; FastAPI 200 → proxied 200 with full metrics dict; network failure → 503
   - **Depends on**: T019, T049
@@ -539,35 +539,35 @@
 
 ### 5B — Dashboard Page
 
-- [ ] T073 [US3] Create `src/web-form/app/dashboard/page.tsx` — Server Component; static metadata: `title: "Support Dashboard | NexaFlow"`, `description: "Real-time support metrics"`, `og:title`, `og:description`; initial server-side fetch of metrics → pass as `initialMetrics` to `<DashboardContent>`
+- [X] T073 [US3] Create `src/web-form/app/dashboard/page.tsx` — Server Component; static metadata: `title: "Support Dashboard | NexaFlow"`, `description: "Real-time support metrics"`, `og:title`, `og:description`; initial server-side fetch of metrics → pass as `initialMetrics` to `<DashboardContent>`
   - **File**: `src/web-form/app/dashboard/page.tsx` (NEW)
   - **Acceptance**: `export const metadata`; no `'use client'`; `<DashboardContent initialMetrics={metrics} />` rendered; page title correct in browser tab
   - **Depends on**: T072, T021
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T074 [US3] Create `src/web-form/app/dashboard/DashboardContent.tsx` — Client Component (`'use client'`); `useState<MetricsSummary>(initialMetrics)` for metrics; `useEffect` with `setInterval(refreshMetrics, 30000)`; `refreshMetrics` calls `GET /api/metrics`, calls `setMetrics(json)` on success; cleanup `clearInterval` on unmount
+- [X] T074 [US3] Create `src/web-form/app/dashboard/DashboardContent.tsx` — Client Component (`'use client'`); `useState<MetricsSummary>(initialMetrics)` for metrics; `useEffect` with `setInterval(refreshMetrics, 30000)`; `refreshMetrics` calls `GET /api/metrics`, calls `setMetrics(json)` on success; cleanup `clearInterval` on unmount
   - **File**: `src/web-form/app/dashboard/DashboardContent.tsx` (NEW)
   - **Acceptance**: `'use client'` present; interval fires every 30s; cleanup prevents memory leak; metric cards update without full page reload when interval fires
   - **Depends on**: T073
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T075 [US3] Add 4 metric cards to `DashboardContent.tsx` using shadcn `<Card>`: Total Tickets (Lucide `Ticket` icon), Open Tickets (Lucide `AlertCircle` icon), Resolved Tickets (Lucide `CheckCircle2` icon), Escalation Rate — `\`${metrics.escalation_rate}%\`` (Lucide `ArrowUpRight` icon); `grid grid-cols-2 md:grid-cols-4 gap-4`
+- [X] T075 [US3] Add 4 metric cards to `DashboardContent.tsx` using shadcn `<Card>`: Total Tickets (Lucide `Ticket` icon), Open Tickets (Lucide `AlertCircle` icon), Resolved Tickets (Lucide `CheckCircle2` icon), Escalation Rate — `\`${metrics.escalation_rate}%\`` (Lucide `ArrowUpRight` icon); `grid grid-cols-2 md:grid-cols-4 gap-4`
   - **File**: `src/web-form/app/dashboard/DashboardContent.tsx` (UPDATE)
   - **Acceptance**: All 4 cards render with correct values from `metrics`; Escalation Rate shows `%` suffix; icons visible; 2-column mobile grid, 4-column desktop grid
   - **Depends on**: T074
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T076 [US3] Add recent tickets table to `DashboardContent.tsx` using shadcn `<Table>`: columns — Ticket ID (`font-mono`), Channel, Category, Priority, Status (`<StatusBadge>`), Time (relative — "2 hours ago" via `Intl.RelativeTimeFormat`); map `metrics.recent_tickets`; on mobile hide Channel and Category columns via `hidden md:table-cell`
+- [X] T076 [US3] Add recent tickets table to `DashboardContent.tsx` using shadcn `<Table>`: columns — Ticket ID (`font-mono`), Channel, Category, Priority, Status (`<StatusBadge>`), Time (relative — "2 hours ago" via `Intl.RelativeTimeFormat`); map `metrics.recent_tickets`; on mobile hide Channel and Category columns via `hidden md:table-cell`
   - **File**: `src/web-form/app/dashboard/DashboardContent.tsx` (UPDATE)
   - **Acceptance**: Table renders ≤10 rows; `<StatusBadge>` in Status column; Ticket ID is monospace; mobile shows only Ticket ID + Status + Time (3 columns); no horizontal scroll on 375px viewport
   - **Depends on**: T075, T025
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T077 [US3] Add channel breakdown section to `DashboardContent.tsx`: 3 small `<Card>` pills for Email, WhatsApp, Web Form with counts from `metrics.channels`; channel icons: `<Mail>`, `<MessageSquare>`, `<Globe>` (Lucide); `flex gap-4 flex-wrap`
+- [X] T077 [US3] Add channel breakdown section to `DashboardContent.tsx`: 3 small `<Card>` pills for Email, WhatsApp, Web Form with counts from `metrics.channels`; channel icons: `<Mail>`, `<MessageSquare>`, `<Globe>` (Lucide); `flex gap-4 flex-wrap`
   - **File**: `src/web-form/app/dashboard/DashboardContent.tsx` (UPDATE)
   - **Acceptance**: 3 channel cards render; counts come from `metrics.channels.email`, `metrics.channels.whatsapp`, `metrics.channels.web_form`; wrap correctly on mobile; no crash if channel count is 0
   - **Depends on**: T076
@@ -584,21 +584,21 @@
 
 **Independent Test**: Navigate to `/`. Assert: (a) NexaFlow logo and tagline visible; (b) 3 feature cards present; (c) "Get Support" CTA links to `/support`; (d) Framer Motion entrance animations complete within 600ms.
 
-- [ ] T078 [US4] Create `src/web-form/app/page.tsx` — Server Component; static metadata: `title: "NexaFlow | Intelligent Customer Support"`, `description: "AI-powered 24/7 customer support for NexaFlow SaaS platform"`, `og:type: "website"`, `og:title`, `og:description`
+- [X] T078 [US4] Create `src/web-form/app/page.tsx` — Server Component; static metadata: `title: "NexaFlow | Intelligent Customer Support"`, `description: "AI-powered 24/7 customer support for NexaFlow SaaS platform"`, `og:type: "website"`, `og:title`, `og:description`
   - **File**: `src/web-form/app/page.tsx` (UPDATE — replace scaffold default)
   - **Acceptance**: `export const metadata`; no `'use client'`; OG tags in rendered HTML `<head>`; browser tab shows "NexaFlow | Intelligent Customer Support"
   - **Depends on**: T007
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T079 [US4] Build hero section in `src/web-form/app/page.tsx`: `<FadeIn>` wrapper around centered `<NexaFlowLogo size="lg" />` (80px variant), `<h1>"Intelligent Customer Success Platform"</h1>`, `<p>` subtext, `<Button asChild><Link href="/support">Get Support</Link></Button>`; `min-h-[60vh] flex flex-col items-center justify-center`; background `bg-[#0F172A]`
+- [X] T079 [US4] Build hero section in `src/web-form/app/page.tsx`: `<FadeIn>` wrapper around centered `<NexaFlowLogo size="lg" />` (80px variant), `<h1>"Intelligent Customer Success Platform"</h1>`, `<p>` subtext, `<Button asChild><Link href="/support">Get Support</Link></Button>`; `min-h-[60vh] flex flex-col items-center justify-center`; background `bg-[#0F172A]`
   - **File**: `src/web-form/app/page.tsx` (UPDATE)
   - **Acceptance**: Hero renders with large logo; tagline text matches exactly "Intelligent Customer Success Platform"; CTA button links to `/support`; `<FadeIn>` animation plays on load; background is dark navy
   - **Depends on**: T027, T022, T078
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T080 [US4] Build feature cards section in `src/web-form/app/page.tsx`: 3 `<SlideUp delay={0.1 * i}>` wrapped shadcn `<Card>` components — "24/7 AI Support" (Lucide `Clock` icon), "Multi-Channel" (Lucide `Globe` icon), "Smart Routing" (Lucide `Zap` icon); `grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto`; card style: `bg-slate-800/50 border-slate-700`
+- [X] T080 [US4] Build feature cards section in `src/web-form/app/page.tsx`: 3 `<SlideUp delay={0.1 * i}>` wrapped shadcn `<Card>` components — "24/7 AI Support" (Lucide `Clock` icon), "Multi-Channel" (Lucide `Globe` icon), "Smart Routing" (Lucide `Zap` icon); `grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto`; card style: `bg-slate-800/50 border-slate-700`
   - **File**: `src/web-form/app/page.tsx` (UPDATE)
   - **Acceptance**: All 3 cards render with correct labels and icons; `SlideUp` animations staggered by 0.1s; single column on mobile, 3-column on md+; cards use dark slate styling
   - **Depends on**: T028, T080
@@ -615,28 +615,28 @@
 
 ### 7A — generateMetadata on All Pages [P]
 
-- [ ] T081 [P] Verify `/` metadata complete in `src/web-form/app/page.tsx`: `og:title: "NexaFlow | Intelligent Customer Support"`, `og:description`, `og:type: "website"` — already added in T078; confirm no missing OG tags
+- [X] T081 [P] Verify `/` metadata complete in `src/web-form/app/page.tsx`: `og:title: "NexaFlow | Intelligent Customer Support"`, `og:description`, `og:type: "website"` — already added in T078; confirm no missing OG tags
   - **File**: `src/web-form/app/page.tsx` (VERIFY)
   - **Acceptance**: Browser DevTools shows `og:title`, `og:description`, `og:type` in `<head>`
   - **Depends on**: T078
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T082 [P] Verify `/support` metadata in `src/web-form/app/support/page.tsx`: `og:title: "Submit a Support Ticket | NexaFlow"`, `og:description`, `og:type: "website"` — already added in T051; confirm all tags present
+- [X] T082 [P] Verify `/support` metadata in `src/web-form/app/support/page.tsx`: `og:title: "Submit a Support Ticket | NexaFlow"`, `og:description`, `og:type: "website"` — already added in T051; confirm all tags present
   - **File**: `src/web-form/app/support/page.tsx` (VERIFY)
   - **Acceptance**: `og:title`, `og:description`, `og:type` present in rendered HTML `<head>` for `/support`
   - **Depends on**: T051
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T083 [P] Verify `/ticket/[id]` dynamic metadata in `src/web-form/app/ticket/[id]/page.tsx`: `generateMetadata` returns `title: "Ticket ${id} | NexaFlow Support"`; falls back gracefully to `"Ticket | NexaFlow Support"` if ticket fetch fails; `og:title` and `og:description` also set dynamically
+- [X] T083 [P] Verify `/ticket/[id]` dynamic metadata in `src/web-form/app/ticket/[id]/page.tsx`: `generateMetadata` returns `title: "Ticket ${id} | NexaFlow Support"`; falls back gracefully to `"Ticket | NexaFlow Support"` if ticket fetch fails; `og:title` and `og:description` also set dynamically
   - **File**: `src/web-form/app/ticket/[id]/page.tsx` (UPDATE if fallback missing)
   - **Acceptance**: Valid ticket ID → title shows actual ID in tab; 404 ticket → fallback title used (not error); OG tags present
   - **Depends on**: T062
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T084 [P] Verify `/dashboard` metadata in `src/web-form/app/dashboard/page.tsx`: `title: "Support Dashboard | NexaFlow"`, `og:title`, `og:description` — already added in T073; confirm all tags
+- [X] T084 [P] Verify `/dashboard` metadata in `src/web-form/app/dashboard/page.tsx`: `title: "Support Dashboard | NexaFlow"`, `og:title`, `og:description` — already added in T073; confirm all tags
   - **File**: `src/web-form/app/dashboard/page.tsx` (VERIFY)
   - **Acceptance**: Browser tab reads "Support Dashboard | NexaFlow"; OG tags in `<head>`
   - **Depends on**: T073
@@ -645,35 +645,35 @@
 
 ### 7B — Error Boundaries + Not-Found Handlers
 
-- [ ] T085 Create `src/web-form/app/error.tsx` — root error boundary: Client Component (`'use client'`); props `{ error: Error, reset: () => void }`; renders "Something went wrong" heading + error message in dev + "Try again" button calling `reset()`
+- [X] T085 Create `src/web-form/app/error.tsx` — root error boundary: Client Component (`'use client'`); props `{ error: Error, reset: () => void }`; renders "Something went wrong" heading + error message in dev + "Try again" button calling `reset()`
   - **File**: `src/web-form/app/error.tsx` (NEW)
   - **Acceptance**: `'use client'` present (required by Next.js); `reset()` called on button click; re-renders page segment on retry; no raw stack trace shown to user in production build
   - **Depends on**: T007
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T086 Create `src/web-form/app/not-found.tsx` — root 404: "Page not found (404)" heading + "The page you're looking for doesn't exist." + `<Link href="/">Return to homepage</Link>` button
+- [X] T086 Create `src/web-form/app/not-found.tsx` — root 404: "Page not found (404)" heading + "The page you're looking for doesn't exist." + `<Link href="/">Return to homepage</Link>` button
   - **File**: `src/web-form/app/not-found.tsx` (NEW)
   - **Acceptance**: Server Component; Link navigates to `/`; renders for any unknown route not handled by a route segment's own `not-found.tsx`
   - **Depends on**: T007
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T087 Create `src/web-form/app/support/error.tsx` and `src/web-form/app/support/not-found.tsx` — both match root patterns; support error links back to support form; support not-found shows "Support page unavailable" + link to `/`
+- [X] T087 Create `src/web-form/app/support/error.tsx` and `src/web-form/app/support/not-found.tsx` — both match root patterns; support error links back to support form; support not-found shows "Support page unavailable" + link to `/`
   - **File**: `src/web-form/app/support/error.tsx` (NEW), `src/web-form/app/support/not-found.tsx` (NEW)
   - **Acceptance**: Both files exist; `error.tsx` has `'use client'`; `not-found.tsx` is Server Component; no duplicate of root patterns needed — just route-specific messaging
   - **Depends on**: T085, T086
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T088 Verify `src/web-form/app/ticket/[id]/not-found.tsx` is complete (created in T071) and create `src/web-form/app/ticket/[id]/error.tsx` — `'use client'`; "Error loading ticket" + reset button + link to `/support`
+- [X] T088 Verify `src/web-form/app/ticket/[id]/not-found.tsx` is complete (created in T071) and create `src/web-form/app/ticket/[id]/error.tsx` — `'use client'`; "Error loading ticket" + reset button + link to `/support`
   - **File**: `src/web-form/app/ticket/[id]/error.tsx` (NEW)
   - **Acceptance**: `'use client'` on error.tsx; `not-found.tsx` from T071 confirmed present; error boundary renders "Error loading ticket" with reset and back-to-support link
   - **Depends on**: T071
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T089 Create `src/web-form/app/dashboard/error.tsx` and `src/web-form/app/dashboard/not-found.tsx` — dashboard error shows "Dashboard unavailable" + reset button; not-found shows "Dashboard not found" + link to `/`
+- [X] T089 Create `src/web-form/app/dashboard/error.tsx` and `src/web-form/app/dashboard/not-found.tsx` — dashboard error shows "Dashboard unavailable" + reset button; not-found shows "Dashboard not found" + link to `/`
   - **File**: `src/web-form/app/dashboard/error.tsx` (NEW), `src/web-form/app/dashboard/not-found.tsx` (NEW)
   - **Acceptance**: Both files exist; `error.tsx` has `'use client'`; previously loaded metrics data not destroyed on reset attempt (handled by Next.js segment error boundary scope)
   - **Depends on**: T085
@@ -682,28 +682,28 @@
 
 ### 7C — Accessibility Audit
 
-- [ ] T090 Audit all 6 form fields in `SupportForm.tsx`: confirm each `<FormField>` → `<FormLabel>` → `<FormControl>` → `<FormMessage>` chain is correct; `<FormMessage>` in shadcn renders with `role="alert"` automatically; add explicit `aria-describedby` to any input missing it
+- [X] T090 Audit all 6 form fields in `SupportForm.tsx`: confirm each `<FormField>` → `<FormLabel>` → `<FormControl>` → `<FormMessage>` chain is correct; `<FormMessage>` in shadcn renders with `role="alert"` automatically; add explicit `aria-describedby` to any input missing it
   - **File**: `src/web-form/app/support/SupportForm.tsx` (UPDATE if needed)
   - **Acceptance**: Each input has `aria-describedby` referencing its error message element; screen reader reads error when field fails; no `id` collisions between fields
   - **Depends on**: T060
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T091 Test keyboard-only navigation of support form: Tab to each field in order (Name → Email → Subject → Category → Priority → Message → Submit); Enter submits; Escape dismisses toast; no focus trap
+- [X] T091 Test keyboard-only navigation of support form: Tab to each field in order (Name → Email → Subject → Category → Priority → Message → Submit); Enter submits; Escape dismisses toast; no focus trap
   - **File**: `src/web-form/app/support/SupportForm.tsx` (UPDATE if fixes needed)
   - **Acceptance**: All fields reachable via Tab; Submit reachable without mouse; Enter on Submit triggers form submission; toast dismissible with Escape; no focus trap — Shift+Tab reverses through fields
   - **Depends on**: T060
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T092 Verify focus rings on all interactive elements: buttons, inputs, select triggers, links must all show `focus-visible:ring-2 focus-visible:ring-[#3B82F6]` or equivalent Tailwind ring class
+- [X] T092 Verify focus rings on all interactive elements: buttons, inputs, select triggers, links must all show `focus-visible:ring-2 focus-visible:ring-[#3B82F6]` or equivalent Tailwind ring class
   - **File**: Multiple — `src/web-form/app/support/SupportForm.tsx`, `src/web-form/components/Navbar.tsx`, `src/web-form/components/ThemeToggle.tsx` (UPDATE if missing)
   - **Acceptance**: Focus ring visible on Tab to each interactive element; ring uses NexaFlow blue or shadcn default ring; no element has `outline-none` without a replacement focus indicator
   - **Depends on**: T091
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T093 Verify `aria-label` on `ThemeToggle` button in `src/web-form/components/ThemeToggle.tsx`: `aria-label="Switch to dark mode"` or `"Switch to light mode"` (context-appropriate, updates with theme)
+- [X] T093 Verify `aria-label` on `ThemeToggle` button in `src/web-form/components/ThemeToggle.tsx`: `aria-label="Switch to dark mode"` or `"Switch to light mode"` (context-appropriate, updates with theme)
   - **File**: `src/web-form/components/ThemeToggle.tsx` (UPDATE if missing)
   - **Acceptance**: `aria-label` changes between "Switch to dark mode" and "Switch to light mode" based on current theme; screen reader announces correct action
   - **Depends on**: T024
@@ -712,28 +712,28 @@
 
 ### 7D — Mobile Responsive Check
 
-- [ ] T094 Test all 4 pages (`/`, `/support`, `/ticket/[id]`, `/dashboard`) at 375px, 768px, 1280px viewport widths using Chrome DevTools; record any horizontal overflow or broken layouts
+- [X] T094 Test all 4 pages (`/`, `/support`, `/ticket/[id]`, `/dashboard`) at 375px, 768px, 1280px viewport widths using Chrome DevTools; record any horizontal overflow or broken layouts
   - **File**: N/A (verification step — fix any issues found in subsequent tasks)
   - **Acceptance**: No `overflow-x: auto` or horizontal scrollbar at 375px on any page; all content visible without horizontal scrolling
   - **Depends on**: T080, T060, T070, T077
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T095 Fix support form layout for mobile in `SupportForm.tsx`: Category and Priority selects in `grid grid-cols-1 sm:grid-cols-2 gap-4` (single column mobile, side-by-side sm+); form card full-width on mobile with `p-4` padding
+- [X] T095 Fix support form layout for mobile in `SupportForm.tsx`: Category and Priority selects in `grid grid-cols-1 sm:grid-cols-2 gap-4` (single column mobile, side-by-side sm+); form card full-width on mobile with `p-4` padding
   - **File**: `src/web-form/app/support/SupportForm.tsx` (UPDATE if needed)
   - **Acceptance**: At 375px Category and Priority stack vertically; at 640px+ they sit side by side; no horizontal overflow; card has comfortable padding on mobile
   - **Depends on**: T094
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T096 Fix dashboard table for mobile in `DashboardContent.tsx`: Channel and Category columns use `hidden md:table-cell` so mobile shows only Ticket ID + Status + Time
+- [X] T096 Fix dashboard table for mobile in `DashboardContent.tsx`: Channel and Category columns use `hidden md:table-cell` so mobile shows only Ticket ID + Status + Time
   - **File**: `src/web-form/app/dashboard/DashboardContent.tsx` (UPDATE if not already done in T076)
   - **Acceptance**: At 375px table shows 3 columns (ID, Status, Time); at 768px+ all 6 columns visible; no horizontal scroll
   - **Depends on**: T094
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T097 Verify all touch targets ≥ 44×44px: submit button, category/priority selects, nav links, ThemeToggle button; add `min-h-[44px]` or `py-3` if any target is smaller
+- [X] T097 Verify all touch targets ≥ 44×44px: submit button, category/priority selects, nav links, ThemeToggle button; add `min-h-[44px]` or `py-3` if any target is smaller
   - **File**: `src/web-form/app/support/SupportForm.tsx`, `src/web-form/components/Navbar.tsx`, `src/web-form/components/ThemeToggle.tsx` (UPDATE if needed)
   - **Acceptance**: Chrome DevTools "Tap target size" audit shows no violations; submit button is at least 44px tall; ThemeToggle button is at least 44×44px
   - **Depends on**: T094
@@ -742,21 +742,21 @@
 
 ### 7E — Lighthouse Documentation
 
-- [ ] T098 Run Lighthouse on all 4 pages in Chrome DevTools (Incognito mode, mobile preset): record Performance, Accessibility, Best Practices, SEO scores; target ≥90 on all 4 categories for all 4 pages
+- [X] T098 Run Lighthouse on all 4 pages in Chrome DevTools (Incognito mode, mobile preset): record Performance, Accessibility, Best Practices, SEO scores; target ≥90 on all 4 categories for all 4 pages
   - **File**: N/A (scores to be recorded in T099)
   - **Acceptance**: Lighthouse runs to completion without timeout; scores recorded; any category below 90 triggers a fix task
   - **Depends on**: T097
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T099 Apply Lighthouse fixes if any score is below 90: common fixes — add `next/image` if any `<img>` tags used; ensure all pages have meta description (T082-T084 should cover this); fix any missing labels caught by accessibility audit
+- [X] T099 Apply Lighthouse fixes if any score is below 90: common fixes — add `next/image` if any `<img>` tags used; ensure all pages have meta description (T082-T084 should cover this); fix any missing labels caught by accessibility audit
   - **File**: Any page with score < 90 (UPDATE as needed)
   - **Acceptance**: After fixes, all 4 pages achieve ≥90 on Performance, Accessibility, Best Practices, SEO
   - **Depends on**: T098
   - **Test needed**: No
   - **HIGH RISK**: No
 
-- [ ] T100 Document final Lighthouse scores in `src/web-form/README.md`: one table with 4 pages × 4 Lighthouse categories; include last-run date (2026-04-05)
+- [X] T100 Document final Lighthouse scores in `src/web-form/README.md`: one table with 4 pages × 4 Lighthouse categories; include last-run date (2026-04-05)
   - **File**: `src/web-form/README.md` (NEW)
   - **Acceptance**: Markdown table with columns: Page, Performance, Accessibility, Best Practices, SEO; all scores ≥90; date noted
   - **Depends on**: T099
