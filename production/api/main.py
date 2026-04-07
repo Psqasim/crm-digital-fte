@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from production.api.web_form_routes import router as web_form_router
 from production.api.webhooks import router
 from production.channels.kafka_producer import stop_kafka_producer
 
@@ -24,3 +25,4 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan, title="CRM Digital FTE — Channel Webhooks")
 app.include_router(router)
+app.include_router(web_form_router)

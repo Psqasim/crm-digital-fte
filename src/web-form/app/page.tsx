@@ -1,65 +1,92 @@
-import Image from "next/image";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { Clock, Globe, Zap } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import NexaFlowLogo from "@/components/NexaFlowLogo";
+import FadeIn from "@/components/animations/FadeIn";
+import SlideUp from "@/components/animations/SlideUp";
 
-export default function Home() {
+export const metadata: Metadata = {
+  title: "NexaFlow | Intelligent Customer Support",
+  description: "AI-powered 24/7 customer support for NexaFlow SaaS platform",
+  openGraph: {
+    type: "website",
+    title: "NexaFlow | Intelligent Customer Support",
+    description: "AI-powered 24/7 customer support for NexaFlow SaaS platform",
+  },
+};
+
+const features = [
+  {
+    icon: Clock,
+    title: "24/7 AI Support",
+    description:
+      "Round-the-clock AI assistance resolves 75% of tickets without human escalation.",
+  },
+  {
+    icon: Globe,
+    title: "Multi-Channel",
+    description:
+      "Unified support across Email, WhatsApp, and Web — all in one platform.",
+  },
+  {
+    icon: Zap,
+    title: "Smart Routing",
+    description:
+      "Intelligent escalation routes complex cases to the right human agent instantly.",
+  },
+];
+
+export default function HomePage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <main className="min-h-screen bg-[#0F172A] text-white">
+      {/* Hero */}
+      <section className="min-h-[60vh] flex flex-col items-center justify-center px-4 text-center">
+        <FadeIn>
+          <div className="flex flex-col items-center gap-6">
+            <NexaFlowLogo size="lg" />
+            <h1 className="text-4xl md:text-6xl font-bold tracking-tight max-w-3xl">
+              Intelligent Customer Success Platform
+            </h1>
+            <p className="text-lg md:text-xl text-slate-400 max-w-2xl">
+              24/7 AI-powered support across Email, WhatsApp, and Web
+            </p>
+            <Link
+              href="/support"
+              className="inline-flex items-center justify-center rounded-lg px-6 py-3 text-base font-semibold text-white bg-[#3B82F6] hover:bg-[#2563EB] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B82F6]"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              Get Support
+            </Link>
+          </div>
+        </FadeIn>
+      </section>
+
+      {/* Feature Cards */}
+      <section className="py-16 px-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+          {features.map((feature, i) => {
+            const Icon = feature.icon;
+            return (
+              <SlideUp key={feature.title} delay={0.1 * i}>
+                <Card className="bg-slate-800/50 border-slate-700 hover:shadow-[0_0_20px_rgba(59,130,246,0.2)] transition-shadow duration-300 h-full">
+                  <CardHeader>
+                    <Icon className="h-8 w-8 text-[#3B82F6] mb-2" />
+                    <CardTitle className="text-white">{feature.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-slate-400">{feature.description}</p>
+                  </CardContent>
+                </Card>
+              </SlideUp>
+            );
+          })}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-8 text-center text-slate-500 text-sm border-t border-slate-800">
+        © 2025 NexaFlow. Powered by AI.
+      </footer>
+    </main>
   );
 }
