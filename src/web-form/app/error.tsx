@@ -9,7 +9,7 @@ interface ErrorProps {
 
 export default function GlobalError({ error, reset }: ErrorProps) {
   return (
-    <main className="min-h-screen bg-background text-foreground flex items-center justify-center px-4">
+    <main className="min-h-screen bg-[#0F172A] text-white flex items-center justify-center px-4">
       <div className="text-center max-w-md">
         <h1 className="text-3xl font-bold mb-3">Something went wrong</h1>
         <p className="text-slate-400 mb-6">

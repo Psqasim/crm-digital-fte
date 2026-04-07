@@ -51,7 +51,7 @@ export default async function TicketPage({ params }: Props) {
   }
 
   return (
-    <main className="min-h-screen bg-background text-foreground py-12 px-4">
+    <main className="min-h-screen bg-[#0F172A] text-white py-12 px-4">
       <div className="max-w-2xl mx-auto">
         <TicketStatus initialData={ticket} ticketId={id} />
       </div>

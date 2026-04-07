@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function DashboardNotFound() {
   return (
-    <main className="min-h-screen bg-background text-foreground flex items-center justify-center px-4">
+    <main className="min-h-screen bg-[#0F172A] text-white flex items-center justify-center px-4">
       <div className="text-center">
         <h1 className="text-2xl font-bold mb-3">Dashboard not found</h1>
         <p className="text-slate-400 mb-6">
