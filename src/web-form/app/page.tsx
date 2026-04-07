@@ -39,7 +39,7 @@ const features = [
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-[#0F172A] text-white">
+    <main className="min-h-screen bg-background text-foreground">
       {/* Hero */}
       <section className="min-h-[60vh] flex flex-col items-center justify-center px-4 text-center">
         <FadeIn>
