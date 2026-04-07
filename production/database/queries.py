@@ -287,20 +287,22 @@ async def create_ticket(
     channel: str,
     subject: str | None = None,
     category: str | None = None,
+    priority: str = "medium",
 ) -> str | None:
     """Create a support ticket and return its UUID string."""
     try:
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
                 "INSERT INTO tickets "
-                "  (conversation_id, customer_id, channel, subject, category) "
-                "VALUES ($1, $2, $3, $4, $5) "
-                "RETURNING id",
+                "  (conversation_id, customer_id, channel, subject, category, priority) "
+                "VALUES ($1, $2, $3, $4, $5, $6) "
+                "RETURNING id, priority",
                 conversation_id,
                 customer_id,
                 channel,
                 subject,
                 category,
+                priority,
             )
             return str(row["id"])
     except Exception:
@@ -308,6 +310,145 @@ async def create_ticket(
             "create_ticket failed for conversation_id=%s", conversation_id
         )
         return None
+
+
+async def get_ticket_by_display_id(
+    pool: asyncpg.Pool,
+    ticket_id: str,
+) -> dict[str, Any] | None:
+    """Return full ticket dict by display ID (TKT-XXXXXXXX) or raw UUID string.
+
+    Returns dict with 13 fields or None if not found.
+    """
+    try:
+        async with pool.acquire() as conn:
+            if ticket_id.startswith("TKT-"):
+                suffix = ticket_id[4:].upper()
+                row = await conn.fetchrow(
+                    "SELECT t.id, t.status, t.category, t.priority, t.subject, "
+                    "       t.created_at, t.updated_at, t.resolved_at, "
+                    "       c.name AS customer_name, c.email AS customer_email, "
+                    "       m.content AS body "
+                    "FROM tickets t "
+                    "JOIN customers c ON c.id = t.customer_id "
+                    "LEFT JOIN messages m ON m.conversation_id = t.conversation_id "
+                    "  AND m.role = 'customer' "
+                    "WHERE upper(substring(t.id::text, 1, 8)) = $1 "
+                    "ORDER BY m.created_at ASC "
+                    "LIMIT 1",
+                    suffix,
+                )
+            else:
+                row = await conn.fetchrow(
+                    "SELECT t.id, t.status, t.category, t.priority, t.subject, "
+                    "       t.created_at, t.updated_at, t.resolved_at, "
+                    "       c.name AS customer_name, c.email AS customer_email, "
+                    "       m.content AS body "
+                    "FROM tickets t "
+                    "JOIN customers c ON c.id = t.customer_id "
+                    "LEFT JOIN messages m ON m.conversation_id = t.conversation_id "
+                    "  AND m.role = 'customer' "
+                    "WHERE t.id::text = $1 "
+                    "ORDER BY m.created_at ASC "
+                    "LIMIT 1",
+                    ticket_id,
+                )
+            if row is None:
+                return None
+            internal_id = str(row["id"])
+            display_id = "TKT-" + internal_id[:8].upper()
+            return {
+                "ticket_id": display_id,
+                "internal_id": internal_id,
+                "status": row["status"],
+                "category": row["category"],
+                "priority": row["priority"],
+                "subject": row["subject"],
+                "message": row["body"],
+                "customer_name": row["customer_name"],
+                "customer_email": row["customer_email"],
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+                "resolved_at": row["resolved_at"],
+            }
+    except Exception:
+        logger.exception("get_ticket_by_display_id failed for ticket_id=%s", ticket_id)
+        return None
+
+
+async def get_metrics_summary(
+    pool: asyncpg.Pool,
+) -> dict[str, Any]:
+    """Return aggregated ticket metrics for the dashboard.
+
+    Returns dict matching contracts/web-form-api.md MetricsSummary shape.
+    """
+    try:
+        async with pool.acquire() as conn:
+            counts_row = await conn.fetchrow(
+                "SELECT "
+                "  COUNT(*) AS total, "
+                "  COUNT(*) FILTER (WHERE status = 'open') AS open, "
+                "  COUNT(*) FILTER (WHERE status = 'in_progress') AS in_progress, "
+                "  COUNT(*) FILTER (WHERE status = 'resolved') AS resolved, "
+                "  COUNT(*) FILTER (WHERE status = 'escalated') AS escalated "
+                "FROM tickets"
+            )
+            total = int(counts_row["total"])
+            open_ = int(counts_row["open"])
+            in_progress = int(counts_row["in_progress"])
+            resolved = int(counts_row["resolved"])
+            escalated = int(counts_row["escalated"])
+            escalation_rate = round((escalated / total) * 100, 1) if total > 0 else 0.0
+
+            channel_rows = await conn.fetch(
+                "SELECT channel, COUNT(*) AS cnt FROM tickets GROUP BY channel"
+            )
+            channels: dict[str, int] = {r["channel"]: int(r["cnt"]) for r in channel_rows}
+
+            recent_rows = await conn.fetch(
+                "SELECT t.id, t.status, t.category, t.priority, t.subject, "
+                "       t.created_at, c.name AS customer_name "
+                "FROM tickets t "
+                "JOIN customers c ON c.id = t.customer_id "
+                "ORDER BY t.created_at DESC "
+                "LIMIT 10"
+            )
+            recent_tickets = [
+                {
+                    "ticket_id": "TKT-" + str(r["id"])[:8].upper(),
+                    "status": r["status"],
+                    "category": r["category"],
+                    "priority": r["priority"],
+                    "subject": r["subject"],
+                    "created_at": r["created_at"],
+                    "customer_name": r["customer_name"],
+                }
+                for r in recent_rows
+            ]
+
+            return {
+                "total": total,
+                "open": open_,
+                "in_progress": in_progress,
+                "resolved": resolved,
+                "escalated": escalated,
+                "escalation_rate": escalation_rate,
+                "channels": channels,
+                "recent_tickets": recent_tickets,
+            }
+    except Exception:
+        logger.exception("get_metrics_summary failed")
+        return {
+            "total": 0,
+            "open": 0,
+            "in_progress": 0,
+            "resolved": 0,
+            "escalated": 0,
+            "escalation_rate": 0.0,
+            "channels": {},
+            "recent_tickets": [],
+        }
 
 
 async def update_ticket_status(

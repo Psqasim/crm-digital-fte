@@ -1,0 +1,84 @@
+"""
+production/api/web_form_routes.py
+Phase 4C: Web form FastAPI router — submit, ticket lookup, metrics.
+"""
+
+from __future__ import annotations
+
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
+
+from production.channels.web_form_handler import WebFormInput, submit_ticket
+from production.database import queries
+from production.database.queries import get_db_pool
+
+router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# Dependency helper — lazily returns the shared pool
+# ---------------------------------------------------------------------------
+
+
+async def _pool():
+    return await get_db_pool()
+
+
+# ---------------------------------------------------------------------------
+# POST /support/submit
+# ---------------------------------------------------------------------------
+
+
+@router.post("/support/submit")
+async def submit_support_ticket(body: WebFormInput) -> JSONResponse:
+    """Accept a web form submission, persist to DB, publish to Kafka.
+
+    Returns 201 with ticket ID on success, 500 on DB failure, 422 on bad input.
+    """
+    pool = await _pool()
+    result = await submit_ticket(pool, body)
+    if result is None:
+        return JSONResponse({"detail": "Internal server error"}, status_code=500)
+    return JSONResponse(result, status_code=201)
+
+
+# ---------------------------------------------------------------------------
+# GET /support/ticket/{ticket_id}
+# ---------------------------------------------------------------------------
+
+
+@router.get("/support/ticket/{ticket_id}")
+async def get_ticket(ticket_id: str) -> JSONResponse:
+    """Return ticket details by display ID (TKT-XXXXXXXX) or raw UUID."""
+    pool = await _pool()
+    ticket = await queries.get_ticket_by_display_id(pool, ticket_id)
+    if ticket is None:
+        return JSONResponse({"detail": "Ticket not found"}, status_code=404)
+    # Serialise datetime objects to ISO strings for JSON
+    serialised = {
+        k: v.isoformat() if hasattr(v, "isoformat") else v
+        for k, v in ticket.items()
+    }
+    return JSONResponse(serialised, status_code=200)
+
+
+# ---------------------------------------------------------------------------
+# GET /metrics/summary
+# ---------------------------------------------------------------------------
+
+
+@router.get("/metrics/summary")
+async def get_metrics_summary() -> JSONResponse:
+    """Return aggregated ticket metrics for the support dashboard."""
+    pool = await _pool()
+    metrics = await queries.get_metrics_summary(pool)
+    # Serialise any datetime objects in recent_tickets
+    for t in metrics.get("recent_tickets", []):
+        for k, v in list(t.items()):
+            if hasattr(v, "isoformat"):
+                t[k] = v.isoformat()
+    return JSONResponse(
+        metrics,
+        status_code=200,
+        headers={"Cache-Control": "no-store"},
+    )
