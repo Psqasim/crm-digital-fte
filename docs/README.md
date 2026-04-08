@@ -11,3 +11,4 @@
 | `api/` | [api.md](api/api.md) | All 8 FastAPI endpoints with curl examples |
 | `deploy/` | [deployment.md](deploy/deployment.md) | Deploy to Vercel + Hugging Face Spaces |
 | `web-form/` | [README.md](web-form/README.md) | Web form integration guide |
+| — | [project-evolution.md](project-evolution.md) | Phase-by-phase evolution (incubation → production) |
