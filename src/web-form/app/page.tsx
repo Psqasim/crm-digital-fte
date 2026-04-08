@@ -83,10 +83,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-8 text-center text-slate-500 text-sm border-t border-slate-800">
-        © 2025 NexaFlow. Powered by AI.
-      </footer>
     </main>
   );
 }
