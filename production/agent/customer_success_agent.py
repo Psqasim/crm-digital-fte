@@ -224,14 +224,14 @@ async def process_ticket(ctx: CustomerContext) -> AgentResponse:
 
     # ---- Step 5: Runner.run() with retry (T017) ----
     try:
-        result = await Runner.run(agent, ctx.message, max_turns=10)
+        result = await Runner.run(agent, ctx.message, max_turns=15)
     except (openai.AuthenticationError, openai.PermissionDeniedError):
         raise  # config errors — do not retry or swallow
     except openai.APIError as e:
         print(f"[process_ticket] First APIError: {e} — retrying once", file=sys.stderr)
         await asyncio.sleep(2)
         try:
-            result = await Runner.run(agent, ctx.message, max_turns=10)
+            result = await Runner.run(agent, ctx.message, max_turns=15)
         except openai.APIError as e2:
             print(f"[process_ticket] Second APIError: {e2} — escalating", file=sys.stderr)
             # Best-effort escalation (no ticket_id yet if create_ticket wasn't called)

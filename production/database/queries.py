@@ -19,6 +19,14 @@ import asyncpg
 
 logger = logging.getLogger(__name__)
 
+
+def _serialize_row(row) -> dict:
+    """Convert an asyncpg Record to a plain dict, serializing UUIDs and datetimes to str."""
+    return {
+        k: str(v) if hasattr(v, "hex") or hasattr(v, "isoformat") else v
+        for k, v in dict(row).items()
+    }
+
 # ---------------------------------------------------------------------------
 # Connection pool
 # ---------------------------------------------------------------------------
@@ -234,9 +242,9 @@ async def get_customer_history(
                         "conversation_id": str(conv["id"]),
                         "channel": conv["channel"],
                         "status": conv["status"],
-                        "started_at": conv["started_at"],
-                        "updated_at": conv["updated_at"],
-                        "messages": [dict(m) for m in msg_rows],
+                        "started_at": str(conv["started_at"]) if conv["started_at"] else None,
+                        "updated_at": str(conv["updated_at"]) if conv["updated_at"] else None,
+                        "messages": [_serialize_row(m) for m in msg_rows],
                     }
                 )
             return result
@@ -565,9 +573,18 @@ async def search_knowledge_base(
 
     Returns up to `limit` results sorted by similarity descending.
     embedding must be a list of 1536 floats (text-embedding-3-small).
+    pgvector requires the embedding as a bracketed string: '[0.1,0.2,...]'
     """
     try:
         async with pool.acquire() as conn:
+            # Short-circuit: skip vector search if KB is empty
+            count = await conn.fetchval("SELECT COUNT(*) FROM knowledge_base")
+            if not count:
+                return []
+
+            # pgvector requires a string literal, not a Python list
+            embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
+
             rows = await conn.fetch(
                 "SELECT id, title, content, category, "
                 "       1 - (embedding <=> $1::vector) AS similarity "
@@ -575,7 +592,7 @@ async def search_knowledge_base(
                 "WHERE embedding IS NOT NULL "
                 "ORDER BY embedding <=> $1::vector "
                 "LIMIT $2",
-                embedding,
+                embedding_str,
                 limit,
             )
             return [dict(r) for r in rows]

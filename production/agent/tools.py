@@ -87,6 +87,13 @@ async def _search_knowledge_base_impl(params: SearchKBInput) -> str:
         pool = await get_db_pool()
         results = await queries.search_knowledge_base(pool, embedding, params.limit)
 
+        if not results:
+            return json.dumps({
+                "results": [],
+                "count": 0,
+                "note": "No product documentation available yet. Please provide a general helpful response based on NexaFlow's capabilities as a B2B workflow automation platform.",
+            })
+
         return json.dumps({
             "results": [
                 {
@@ -102,7 +109,11 @@ async def _search_knowledge_base_impl(params: SearchKBInput) -> str:
         })
     except Exception as e:
         print(f"[search_knowledge_base ERROR] {e}", file=sys.stderr)
-        return json.dumps({"error": str(e), "tool": "search_knowledge_base"})
+        return json.dumps({
+            "results": [],
+            "count": 0,
+            "note": "Knowledge base temporarily unavailable. Please provide a helpful response based on general NexaFlow support knowledge.",
+        })
 
 
 @function_tool

@@ -129,8 +129,10 @@ async def test_search_knowledge_base_db_error(mock_pool, mock_openai_client):
         result_str = await _search_knowledge_base_impl(SearchKBInput(query="anything", limit=5))
         result = json.loads(result_str)
 
-    assert "error" in result
-    assert result["tool"] == "search_knowledge_base"
+    # On DB error the tool now returns a graceful fallback (no naked error key)
+    assert result["count"] == 0
+    assert result["results"] == []
+    assert "note" in result
 
 
 # ---------------------------------------------------------------------------
