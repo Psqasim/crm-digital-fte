@@ -80,7 +80,7 @@ npm-debug.log
 yarn-debug.log
 
 # Docker
-.dockerignore
+# .dockerignore is tracked so CI/CD has correct build context exclusions
 
 # IDE and editors
 .idea/
