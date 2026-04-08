@@ -692,13 +692,16 @@ async def upsert_knowledge_base(
                     title,
                     category,
                 )
+                # Serialize embedding list to pgvector string format
+                embedding_str = "[" + ",".join(str(v) for v in embedding) + "]"
+
                 if existing:
                     await conn.execute(
                         "UPDATE knowledge_base "
                         "SET content = $1, embedding = $2::vector, updated_at = NOW() "
                         "WHERE id = $3",
                         content,
-                        embedding,
+                        embedding_str,
                         existing["id"],
                     )
                     return str(existing["id"])
@@ -710,7 +713,7 @@ async def upsert_knowledge_base(
                     title,
                     content,
                     category,
-                    embedding,
+                    embedding_str,
                 )
                 return str(row["id"])
     except Exception:
