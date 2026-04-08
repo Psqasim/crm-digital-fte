@@ -43,16 +43,33 @@ async def _process_ticket_background(ticket_id: str) -> None:
 
 async def _run_agent_on_ticket(pool, ticket: dict) -> AgentResponse:
     """Core logic: build context, run agent, update DB, return AgentResponse."""
+    display_ticket_id = ticket.get("ticket_id") or ""
+    conversation_id_uuid = ticket.get("conversation_id") or ""
+    customer_id_uuid = ticket.get("customer_id") or ""
+    raw_message = ticket.get("message") or ticket.get("subject") or ""
+
+    # Tell the agent the ticket already exists so it skips create_ticket.
+    # Include real UUIDs so any tool calls use valid values.
+    enriched_message = (
+        f"[EXISTING TICKET — do NOT call create_ticket]\n"
+        f"ticket_id={display_ticket_id} | conversation_id={conversation_id_uuid} | customer_id={customer_id_uuid}\n"
+        f"Customer message: {raw_message}"
+    ) if display_ticket_id else raw_message
+
     ctx = CustomerContext(
         customer_id=ticket.get("customer_id") or "",
         customer_name=ticket.get("customer_name") or "Customer",
         customer_email=ticket.get("customer_email") or "",
         channel=ticket.get("channel") or "web",
-        message=ticket.get("message") or ticket.get("subject") or "",
+        message=enriched_message,
         conversation_id=ticket.get("conversation_id"),
     )
 
     agent_resp = await process_ticket(ctx)
+
+    # If the agent didn't call create_ticket (ticket already exists), fill ticket_id from DB
+    if agent_resp.ticket_id is None and display_ticket_id:
+        agent_resp.ticket_id = display_ticket_id
 
     # Update ticket status in DB
     internal_id = ticket.get("internal_id") or ""
