@@ -11,6 +11,7 @@ from __future__ import annotations
 from dotenv import load_dotenv
 load_dotenv()
 
+import asyncio
 import json
 import logging
 import sys
@@ -39,9 +40,34 @@ _PKT = ZoneInfo("Asia/Karachi")
 # ---------------------------------------------------------------------------
 
 
+async def _ticket_processor_loop() -> None:
+    """Background task: process pending tickets every 30 seconds.
+
+    Runs inside the FastAPI process so HF Spaces (single container) can
+    resolve tickets without a separate worker pod.
+    """
+    from production.api.agent_routes import _process_ticket_background  # noqa: PLC0415
+    from production.database.queries import get_pending_tickets  # noqa: PLC0415
+
+    await asyncio.sleep(10)  # wait for DB pool to be ready
+    while True:
+        try:
+            pool = await get_db_pool()
+            tickets = await get_pending_tickets(pool)
+            if tickets:
+                logger.info("[worker] processing %d pending tickets", len(tickets))
+                for t in tickets:
+                    asyncio.create_task(_process_ticket_background(t["ticket_id"]))
+            else:
+                logger.debug("[worker] no pending tickets")
+        except Exception:
+            logger.exception("[worker] poll error — retrying in 30s")
+        await asyncio.sleep(30)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialise DB pool on startup; close Kafka producer on shutdown."""
+    """Initialise DB pool on startup; start background worker; close on shutdown."""
     try:
         app.state.db_pool = await get_db_pool()
         logger.info("[lifespan] DB pool ready")
@@ -49,10 +75,15 @@ async def lifespan(app: FastAPI):
         logger.exception("[lifespan] DB pool init failed — continuing without pool")
         app.state.db_pool = None
 
+    # Start background ticket processor (replaces separate worker process on HF Spaces)
+    worker_task = asyncio.create_task(_ticket_processor_loop())
+    logger.info("[lifespan] background ticket processor started")
+
     yield
 
+    worker_task.cancel()
     await stop_kafka_producer()
-    logger.info("[lifespan] Kafka producer stopped")
+    logger.info("[lifespan] shutdown complete")
 
 
 # ---------------------------------------------------------------------------
@@ -69,7 +100,12 @@ app = FastAPI(
 # CORS — allow Next.js dev server and production origin
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://nexaflow.com"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://nexaflow.com",
+        "https://crm-digital-fte-two.vercel.app",
+        "https://*.vercel.app",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
