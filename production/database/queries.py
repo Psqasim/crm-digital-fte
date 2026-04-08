@@ -325,7 +325,8 @@ async def get_ticket_by_display_id(
             if ticket_id.startswith("TKT-"):
                 suffix = ticket_id[4:].upper()
                 row = await conn.fetchrow(
-                    "SELECT t.id, t.status, t.category, t.priority, t.subject, "
+                    "SELECT t.id, t.conversation_id, t.customer_id, "
+                    "       t.status, t.category, t.priority, t.subject, "
                     "       t.created_at, t.updated_at, t.resolved_at, "
                     "       c.name AS customer_name, c.email AS customer_email, "
                     "       m.content AS body "
@@ -340,7 +341,8 @@ async def get_ticket_by_display_id(
                 )
             else:
                 row = await conn.fetchrow(
-                    "SELECT t.id, t.status, t.category, t.priority, t.subject, "
+                    "SELECT t.id, t.conversation_id, t.customer_id, "
+                    "       t.status, t.category, t.priority, t.subject, "
                     "       t.created_at, t.updated_at, t.resolved_at, "
                     "       c.name AS customer_name, c.email AS customer_email, "
                     "       m.content AS body "
@@ -360,6 +362,8 @@ async def get_ticket_by_display_id(
             return {
                 "ticket_id": display_id,
                 "internal_id": internal_id,
+                "conversation_id": str(row["conversation_id"]) if row["conversation_id"] else None,
+                "customer_id": str(row["customer_id"]) if row["customer_id"] else None,
                 "status": row["status"],
                 "category": row["category"],
                 "priority": row["priority"],
@@ -491,6 +495,60 @@ async def update_ticket_status(
             ticket_id,
             status,
         )
+
+
+async def get_pending_tickets(
+    pool: asyncpg.Pool,
+    statuses: tuple[str, ...] = ("open", "pending"),
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """Return tickets with the given statuses (default: open, pending).
+
+    Each item contains ticket_id (TKT-XXXXXXXX), internal_id, status, channel,
+    conversation_id, customer_id, customer_name, customer_email, and message.
+    """
+    try:
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT t.id, t.conversation_id, t.customer_id, t.status, "
+                "       t.channel, t.subject, "
+                "       c.name AS customer_name, c.email AS customer_email, "
+                "       m.content AS body "
+                "FROM tickets t "
+                "JOIN customers c ON c.id = t.customer_id "
+                "LEFT JOIN messages m ON m.conversation_id = t.conversation_id "
+                "  AND m.role = 'customer' "
+                "WHERE t.status = ANY($1::text[]) "
+                "ORDER BY t.created_at ASC "
+                "LIMIT $2",
+                list(statuses),
+                limit,
+            )
+            result: list[dict[str, Any]] = []
+            seen: set[str] = set()
+            for r in rows:
+                internal_id = str(r["id"])
+                if internal_id in seen:
+                    continue
+                seen.add(internal_id)
+                result.append(
+                    {
+                        "ticket_id": "TKT-" + internal_id[:8].upper(),
+                        "internal_id": internal_id,
+                        "conversation_id": str(r["conversation_id"]) if r["conversation_id"] else None,
+                        "customer_id": str(r["customer_id"]) if r["customer_id"] else None,
+                        "status": r["status"],
+                        "channel": r["channel"],
+                        "subject": r["subject"],
+                        "customer_name": r["customer_name"],
+                        "customer_email": r["customer_email"],
+                        "message": r["body"],
+                    }
+                )
+            return result
+    except Exception:
+        logger.exception("get_pending_tickets failed")
+        return []
 
 
 # ---------------------------------------------------------------------------
