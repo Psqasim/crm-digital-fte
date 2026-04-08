@@ -1,3 +1,12 @@
+---
+title: CRM Digital FTE API
+emoji: 🤖
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+pinned: false
+---
+
 # CRM Digital FTE Factory
 
 **GIAIC Hackathon 5 — Production AI Customer Success Agent**
