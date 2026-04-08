@@ -9,6 +9,7 @@ fall back gracefully.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import sys
@@ -43,24 +44,37 @@ async def stop_kafka_producer() -> None:
     """No-op — confluent-kafka Producer is stateless; kept for API compatibility."""
 
 
+def _to_dict(message: object) -> dict:
+    """Serialize a TicketMessage dataclass, Pydantic model, or plain dict."""
+    if isinstance(message, dict):
+        return message
+    if dataclasses.is_dataclass(message) and not isinstance(message, type):
+        return dataclasses.asdict(message)
+    if hasattr(message, "model_dump"):
+        return message.model_dump()
+    return vars(message)
+
+
 async def publish_ticket(
-    message_dict: dict,
+    message: object,
     topic: str = "fte.tickets.incoming",
 ) -> bool:
-    """Publish *message_dict* to *topic*.
+    """Publish *message* to *topic*.
 
+    Accepts a dict, TicketMessage dataclass, or Pydantic model.
     Synchronous under the hood (confluent-kafka is not async-native); safe to
     await from async callers. Returns True on success, False on any error.
     """
     try:
+        payload = _to_dict(message)
         p = Producer(_get_producer_config())
         p.produce(
             topic,
-            key=str(message_dict.get("ticket_id", "unknown")),
-            value=json.dumps(message_dict),
+            key=str(payload.get("ticket_id", payload.get("id", "unknown"))),
+            value=json.dumps(payload, default=str),
             callback=delivery_report,
         )
-        p.flush(timeout=5)
+        p.flush(timeout=10)
         return True
     except Exception as e:
         print(f"[kafka_error] publish failed: {e}", file=sys.stderr)

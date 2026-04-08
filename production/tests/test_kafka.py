@@ -109,7 +109,7 @@ class TestPublishTicket:
 
         assert result is True
         mock_producer.produce.assert_called_once()
-        mock_producer.flush.assert_called_once_with(timeout=5)
+        mock_producer.flush.assert_called_once_with(timeout=10)
 
     def test_produce_uses_ticket_id_as_key(self, monkeypatch):
         monkeypatch.setenv("KAFKA_BOOTSTRAP_SERVERS", "broker:9092")
