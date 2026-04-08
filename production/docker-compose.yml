@@ -1,1 +1,39 @@
-# Phase 4X will implement this — see specs/customer-success-fte-spec.md
+version: '3.9'
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: production/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file: ../.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ..
+      dockerfile: production/Dockerfile
+    command: python3 -m production.kafka.consumer
+    env_file: ../.env
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ..
+      dockerfile: src/web-form/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api:8000
+    depends_on:
+      - api
+    restart: unless-stopped
