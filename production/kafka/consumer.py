@@ -37,7 +37,12 @@ API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
 
 
 def _handle_message(data: dict) -> None:
-    ticket_id = data.get("ticket_id")
+    # ticket_id may be top-level or nested in metadata (TicketMessage dataclass)
+    ticket_id = (
+        data.get("ticket_id")
+        or (data.get("metadata") or {}).get("ticket_id")
+        or data.get("id")
+    )
     if not ticket_id:
         print("[kafka_consumer] message missing ticket_id, skipping", file=sys.stderr)
         return

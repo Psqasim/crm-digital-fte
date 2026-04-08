@@ -108,7 +108,7 @@ async def submit_ticket(
             subject=body.subject,
             message=body.message,
             received_at=current_dt.isoformat(),
-            metadata={},
+            metadata={"ticket_id": ticket_id_uuid},
         )
         try:
             await publish_ticket(ticket_message)
