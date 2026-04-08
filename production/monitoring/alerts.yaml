@@ -1,0 +1,73 @@
+# NexaFlow — Alert Rules Configuration
+# Phase 4G: Documentation-only — integrate with Prometheus Alertmanager in Phase 5
+#
+# Format mirrors Prometheus alerting rules for drop-in compatibility.
+# Each rule specifies: condition, severity, and remediation runbook.
+
+groups:
+  - name: nexaflow.tickets
+    rules:
+      - alert: HighEscalationRate
+        expr: escalation_rate > 25
+        for: 5m
+        labels:
+          severity: warning
+          team: customer-success
+        annotations:
+          summary: "Escalation rate above 25% threshold"
+          description: >
+            More than 25% of support tickets are being escalated.
+            Current rate: {{ $value }}%.
+            Review agent KB coverage and escalation rules.
+          runbook: "Check /metrics/summary — escalation_rate_percent field"
+
+      - alert: NoTicketsProcessed
+        expr: tickets_resolved_last_60m == 0
+        for: 60m
+        labels:
+          severity: warning
+          team: customer-success
+        annotations:
+          summary: "No tickets resolved in the last 60 minutes"
+          description: >
+            Zero tickets have been resolved in the past 60 minutes,
+            which may indicate agent processing failure or low inbound volume.
+          runbook: "Check Kafka consumer logs and /agent/process-pending endpoint"
+
+  - name: nexaflow.infrastructure
+    rules:
+      - alert: ApiDown
+        expr: probe_http_status_code{job="nexaflow-api", path="/health"} != 200
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "FastAPI service returning non-200 on /health"
+          description: >
+            Two consecutive health checks have failed.
+            The API may be down or the DB connection is broken.
+          runbook: >
+            kubectl -n nexaflow logs deployment/api-deployment --tail=100
+            Check DATABASE_URL env var and Neon PostgreSQL status.
+
+      - alert: KafkaConsumerLag
+        expr: kafka_consumer_lag > 100
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Kafka consumer lag exceeds 100 messages"
+          description: >
+            The ticket processing consumer is falling behind.
+            Current lag: {{ $value }} messages on topic nexaflow-tickets.
+          runbook: >
+            Check worker pod logs:
+            kubectl -n nexaflow logs deployment/worker-deployment --tail=100
+            Consider increasing worker replicas if sustained.
+
+# Notification channels (configure in Alertmanager)
+# receivers:
+#   - email: support-oncall@nexaflow.com (critical only)
+#   - slack: #alerts-customer-success (all severities)

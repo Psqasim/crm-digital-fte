@@ -11,12 +11,15 @@ from __future__ import annotations
 from dotenv import load_dotenv
 load_dotenv()
 
+import json
 import logging
+import sys
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -27,6 +30,8 @@ from production.channels.kafka_producer import stop_kafka_producer
 from production.database.queries import get_db_pool
 
 logger = logging.getLogger(__name__)
+
+_PKT = ZoneInfo("Asia/Karachi")
 
 
 # ---------------------------------------------------------------------------
@@ -68,6 +73,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ---------------------------------------------------------------------------
+# Structured request logging middleware (JSON → stderr)
+# ---------------------------------------------------------------------------
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log every HTTP request as a JSON line to stderr."""
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = round((time.perf_counter() - start) * 1000, 1)
+    ts = datetime.now(_PKT).isoformat()
+    record = {
+        "ts": ts,
+        "method": request.method,
+        "path": request.url.path,
+        "status": response.status_code,
+        "duration_ms": duration_ms,
+    }
+    print(json.dumps(record), file=sys.stderr)
+    return response
 
 # ---------------------------------------------------------------------------
 # Routers

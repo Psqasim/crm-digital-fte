@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 
 from production.channels.web_form_handler import WebFormInput, submit_ticket
 from production.database import queries
-from production.database.queries import get_db_pool
+from production.database.queries import get_channel_metrics, get_db_pool
 
 router = APIRouter()
 
@@ -79,6 +79,23 @@ async def get_metrics_summary() -> JSONResponse:
                 t[k] = v.isoformat()
     return JSONResponse(
         metrics,
+        status_code=200,
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /metrics/channels
+# ---------------------------------------------------------------------------
+
+
+@router.get("/metrics/channels")
+async def get_metrics_channels() -> JSONResponse:
+    """Return per-channel ticket metrics (email, whatsapp, web_form)."""
+    pool = await _pool()
+    data = await get_channel_metrics(pool)
+    return JSONResponse(
+        data,
         status_code=200,
         headers={"Cache-Control": "no-store"},
     )

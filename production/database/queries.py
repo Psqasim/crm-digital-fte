@@ -394,6 +394,8 @@ async def get_metrics_summary(
     """Return aggregated ticket metrics for the dashboard.
 
     Returns dict matching contracts/web-form-api.md MetricsSummary shape.
+    Includes: counts, escalation_rate_percent, avg_resolution_time_minutes,
+    tickets_last_24h, top_categories, channel_breakdown, recent_tickets.
     """
     try:
         async with pool.acquire() as conn:
@@ -403,7 +405,10 @@ async def get_metrics_summary(
                 "  COUNT(*) FILTER (WHERE status = 'open') AS open, "
                 "  COUNT(*) FILTER (WHERE status = 'in_progress') AS in_progress, "
                 "  COUNT(*) FILTER (WHERE status = 'resolved') AS resolved, "
-                "  COUNT(*) FILTER (WHERE status = 'escalated') AS escalated "
+                "  COUNT(*) FILTER (WHERE status = 'escalated') AS escalated, "
+                "  COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '24 hours') AS last_24h, "
+                "  ROUND(EXTRACT(EPOCH FROM AVG(resolved_at - created_at)) / 60, 1) "
+                "    AS avg_resolution_minutes "
                 "FROM tickets"
             )
             total = int(counts_row["total"])
@@ -411,12 +416,27 @@ async def get_metrics_summary(
             in_progress = int(counts_row["in_progress"])
             resolved = int(counts_row["resolved"])
             escalated = int(counts_row["escalated"])
+            last_24h = int(counts_row["last_24h"])
             escalation_rate = round((escalated / total) * 100, 1) if total > 0 else 0.0
+            avg_resolution = float(counts_row["avg_resolution_minutes"] or 0.0)
 
             channel_rows = await conn.fetch(
                 "SELECT channel, COUNT(*) AS cnt FROM tickets GROUP BY channel"
             )
             channels: dict[str, int] = {r["channel"]: int(r["cnt"]) for r in channel_rows}
+
+            category_rows = await conn.fetch(
+                "SELECT category, COUNT(*) AS cnt "
+                "FROM tickets "
+                "WHERE category IS NOT NULL "
+                "GROUP BY category "
+                "ORDER BY cnt DESC "
+                "LIMIT 3"
+            )
+            top_categories = [
+                {"category": r["category"], "count": int(r["cnt"])}
+                for r in category_rows
+            ]
 
             recent_rows = await conn.fetch(
                 "SELECT t.id, t.status, t.category, t.priority, t.subject, "
@@ -446,6 +466,11 @@ async def get_metrics_summary(
                 "resolved": resolved,
                 "escalated": escalated,
                 "escalation_rate": escalation_rate,
+                "escalation_rate_percent": escalation_rate,
+                "avg_resolution_time_minutes": avg_resolution,
+                "tickets_last_24h": last_24h,
+                "top_categories": top_categories,
+                "channel_breakdown": channels,
                 "channels": channels,
                 "recent_tickets": recent_tickets,
             }
@@ -458,8 +483,54 @@ async def get_metrics_summary(
             "resolved": 0,
             "escalated": 0,
             "escalation_rate": 0.0,
+            "escalation_rate_percent": 0.0,
+            "avg_resolution_time_minutes": 0.0,
+            "tickets_last_24h": 0,
+            "top_categories": [],
+            "channel_breakdown": {},
             "channels": {},
             "recent_tickets": [],
+        }
+
+
+async def get_channel_metrics(
+    pool: asyncpg.Pool,
+) -> dict[str, Any]:
+    """Return per-channel ticket metrics.
+
+    Returns dict keyed by channel with total/open/resolved/avg_resolution_min.
+    """
+    try:
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT "
+                "  channel, "
+                "  COUNT(*) AS total, "
+                "  COUNT(*) FILTER (WHERE status = 'open') AS open, "
+                "  COUNT(*) FILTER (WHERE status = 'resolved') AS resolved, "
+                "  ROUND(EXTRACT(EPOCH FROM AVG(resolved_at - created_at)) / 60, 1) "
+                "    AS avg_resolution_min "
+                "FROM tickets "
+                "GROUP BY channel"
+            )
+            result: dict[str, Any] = {}
+            for r in rows:
+                result[r["channel"]] = {
+                    "total": int(r["total"]),
+                    "open": int(r["open"]),
+                    "resolved": int(r["resolved"]),
+                    "avg_resolution_min": float(r["avg_resolution_min"] or 0.0),
+                }
+            # Ensure standard channels always present even if no tickets yet
+            for ch in ("email", "whatsapp", "web_form"):
+                if ch not in result:
+                    result[ch] = {"total": 0, "open": 0, "resolved": 0, "avg_resolution_min": 0.0}
+            return result
+    except Exception:
+        logger.exception("get_channel_metrics failed")
+        return {
+            ch: {"total": 0, "open": 0, "resolved": 0, "avg_resolution_min": 0.0}
+            for ch in ("email", "whatsapp", "web_form")
         }
 
 
