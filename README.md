@@ -2,61 +2,103 @@
 
 **GIAIC Hackathon 5 — Production AI Customer Success Agent**
 
+![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python)
+![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)
+![Kafka](https://img.shields.io/badge/Kafka-Confluent_Cloud-red?logo=apachekafka)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-green?logo=postgresql)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.110-teal?logo=fastapi)
+![License](https://img.shields.io/badge/License-MIT-yellow)
+
 ---
 
 ## What is This?
 
-CRM Digital FTE Factory is a production-grade AI-powered Customer Success agent built for **NexaFlow** — a fictional B2B SaaS workflow automation platform. The system acts as a full-time employee (FTE) for NexaFlow's support team, autonomously handling customer support tickets 24/7 across three channels.
+**CRM Digital FTE Factory** is a production-grade AI Customer Success agent for **NexaFlow** — a B2B SaaS workflow automation platform. The AI acts as a full-time employee (FTE), autonomously handling ~800 support tickets/week across **3 channels** with a 75% AI resolution rate — no human needed for most tickets.
 
 ---
 
-## What is NexaFlow?
+## Architecture
 
-NexaFlow is a B2B SaaS workflow automation platform serving 3,000 business customers. It allows teams to build automations, connect tools like Slack, Jira, GitHub, and Google Calendar, and manage projects without writing code. Plans range from a free Starter tier to a $199/month Enterprise plan with API access and dedicated Customer Success Managers.
+```
+┌─────────────┐   ┌──────────────┐   ┌──────────────────┐
+│   Gmail      │   │  WhatsApp    │   │  Next.js Web Form │
+│  (Email)     │   │  (Twilio)    │   │  (3-step form)   │
+└──────┬───────┘   └──────┬───────┘   └────────┬─────────┘
+       │                  │                    │
+       └──────────────────┼────────────────────┘
+                          │
+                   ┌──────▼──────┐
+                   │    Kafka     │  ← Confluent Cloud
+                   │  (Queue)     │
+                   └──────┬───────┘
+                          │
+                   ┌──────▼──────────────────────┐
+                   │   FastAPI Orchestration      │
+                   │   + OpenAI Agents SDK        │
+                   │   + 7 tools (KB, escalation) │
+                   └──────┬───────────────────────┘
+                          │
+              ┌───────────┼───────────┐
+              │                       │
+     ┌────────▼──────┐   ┌────────────▼────────┐
+     │  Neon          │   │  Human Escalation    │
+     │  PostgreSQL    │   │  (Mon-Fri 9-6 PKT)   │
+     │  + pgvector    │   └─────────────────────┘
+     └───────────────┘
+```
 
 ---
 
-## 3-Channel Architecture
+## Features
 
-```
-                        ┌─────────────────────────┐
-                        │   NexaFlow AI Support    │
-                        │      Agent (Core)        │
-                        │  OpenAI Agents SDK +     │
-                        │  FastAPI + Kafka          │
-                        └────────┬────────┬────────┘
-                                 │        │
-            ┌────────────────────┼────────┼────────────────────┐
-            │                   │        │                    │
-            ▼                   ▼        ▼                    ▼
-    ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────┐
-    │   Gmail       │  │  WhatsApp    │  │  Web Support │  │  Human   │
-    │   Channel     │  │  (Twilio)    │  │  Form        │  │  Escalat │
-    │  (Email)      │  │  Channel     │  │  (Next.js)   │  │  -ion    │
-    └──────────────┘  └──────────────┘  └──────────────┘  └──────────┘
-```
-
-Each channel ingests tickets into a **Kafka message queue**, which feeds the AI agent. The agent classifies, responds, and escalates tickets using:
-- **Neon PostgreSQL + pgvector** for context storage and semantic search
-- **OpenAI Agents SDK** for reasoning and tool use
-- **Escalation rules** for routing to human agents
+- **3-channel support:** Gmail (email), WhatsApp (Twilio), Next.js web form
+- **AI agent with 7 tools:** knowledge base search, ticket creation, customer lookup, escalation, sentiment analysis, SLA check, history retrieval
+- **Real-time status:** ticket status polling via web form frontend
+- **Kafka streaming:** decoupled, scalable message queue (Confluent Cloud)
+- **pgvector semantic search:** OpenAI embeddings for knowledge base queries
+- **Structured logging:** JSON logs per request to stderr
+- **Monitoring:** `/health`, `/metrics/summary`, `/metrics/channels` endpoints
+- **Containerized:** Docker + Docker Compose + Kubernetes manifests
 
 ---
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|-----------|
+| Layer | Technology |
+|-------|-----------|
 | Agent Runtime | Python 3.12 + OpenAI Agents SDK |
 | API Server | FastAPI |
 | Database | Neon PostgreSQL + pgvector |
-| Message Queue | Apache Kafka |
-| Web Support Form | Next.js 15 (App Router) |
+| Message Queue | Apache Kafka (Confluent Cloud) |
+| Frontend | Next.js 15 App Router |
 | Email Channel | Gmail API (OAuth 2.0) |
 | WhatsApp Channel | Twilio WhatsApp Business API |
-| Containerization | Docker + Docker Compose |
-| Orchestration | Kubernetes (Minikube local / Oracle Cloud VM prod) |
-| Spec Methodology | Spec-Kit Plus (Panaversity) |
+| Containers | Docker + Docker Compose |
+| Orchestration | Kubernetes (Minikube / Oracle Cloud VM) |
+
+---
+
+## Quick Start
+
+```bash
+# 1. Clone
+git clone https://github.com/Psqasim/crm-digital-fte.git && cd crm-digital-fte
+
+# 2. Python setup
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt -r production/requirements.txt
+
+# 3. Environment
+cp .env.example .env   # fill in DATABASE_URL + OPENAI_API_KEY at minimum
+
+# 4. Start FastAPI
+uvicorn production.api.main:app --reload --port 8000
+
+# 5. Verify
+curl http://localhost:8000/health
+```
+
+Full setup instructions → [docs/setup/setup.md](docs/setup/setup.md)
 
 ---
 
@@ -64,32 +106,67 @@ Each channel ingests tickets into a **Kafka message queue**, which feeds the AI 
 
 ```
 crm-digital-fte/
-├── context/              # NexaFlow company & product context files
-├── src/
-│   ├── channels/         # Gmail, WhatsApp, Web Form channel connectors
-│   ├── agent/            # Core AI agent (OpenAI Agents SDK)
-│   └── web-form/         # Next.js 15 support form frontend
-├── tests/                # Unit and integration tests
-├── specs/                # Spec-Kit Plus specification files
+├── context/              # NexaFlow company + product docs
+├── docs/                 # Documentation
+│   ├── README.md         # Docs index
+│   ├── setup/            # Setup guide
+│   ├── env/              # Environment variables
+│   ├── api/              # API reference
+│   ├── deploy/           # Deployment guide
+│   └── web-form/         # Web form integration
 ├── production/
-│   ├── agent/            # Dockerized agent service
-│   ├── channels/         # Channel services
-│   ├── workers/          # Kafka consumer workers
-│   ├── api/              # FastAPI service
-│   ├── database/         # Migrations and schemas
-│   └── k8s/              # Kubernetes manifests
-└── .claude/
-    └── skills/           # Claude Code custom skills
+│   ├── agent/            # AI agent (OpenAI Agents SDK)
+│   ├── api/              # FastAPI app + routes
+│   ├── channels/         # Gmail, WhatsApp, Web Form handlers
+│   ├── database/         # Schema, queries, seed script
+│   ├── kafka/            # Kafka consumer
+│   ├── monitoring/       # Metrics + alerts
+│   ├── tests/            # Production + E2E tests
+│   ├── workers/          # Background workers
+│   ├── k8s/              # Kubernetes manifests
+│   └── docker-compose.yml
+├── src/
+│   ├── agent/            # Core agent models + prototype
+│   └── web-form/         # Next.js 15 frontend
+├── specs/                # Spec-Kit Plus specs per phase
+├── tests/                # Unit tests
+└── LICENSE
 ```
 
 ---
 
-## Setup
+## Screenshots
 
-See deployment guide (Phase 5 — Implementation).
+> _Add screenshots here — web form, ticket status page, agent response._
 
 ---
 
-## Hackathon Context
+## Documentation
 
-This project is built for **GIAIC (Governor Initiative for AI and Computing) Hackathon 5**, demonstrating a production-ready multi-channel AI customer success system using modern cloud-native tooling and the OpenAI Agents SDK.
+Full docs in [`docs/`](docs/README.md):
+
+| Guide | Link |
+|-------|------|
+| Setup | [docs/setup/setup.md](docs/setup/setup.md) |
+| Env Variables | [docs/env/env.md](docs/env/env.md) |
+| API Reference | [docs/api/api.md](docs/api/api.md) |
+| Deployment | [docs/deploy/deployment.md](docs/deploy/deployment.md) |
+| Web Form | [docs/web-form/README.md](docs/web-form/README.md) |
+
+---
+
+## Tests
+
+```bash
+# 165+ unit + integration tests
+pytest tests/ production/tests/ -v --ignore=production/tests/test_e2e.py
+
+# E2E tests (requires running server + DB)
+TEST_DATABASE_URL="..." pytest production/tests/test_e2e.py -v
+```
+
+---
+
+## License
+
+[MIT](LICENSE) — Muhammad Qasim, 2026
