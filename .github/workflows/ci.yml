@@ -21,7 +21,9 @@ jobs:
         run: |
           pytest tests/ production/tests/ -v --tb=short --ignore=production/tests/test_e2e.py
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-ci-placeholder-not-real' }}
+          DATABASE_URL: ""
+          KAFKA_BOOTSTRAP_SERVERS: ""
 
   build-nextjs:
     runs-on: ubuntu-latest
