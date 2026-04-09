@@ -26,6 +26,7 @@ import type { MetricsSummary, TicketStatus } from "@/lib/types";
 
 interface DashboardContentProps {
   initialMetrics: MetricsSummary | null;
+  user: { name: string; role: string };
 }
 
 function relativeTime(iso: string): string {
@@ -38,7 +39,7 @@ function relativeTime(iso: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-export default function DashboardContent({ initialMetrics }: DashboardContentProps) {
+export default function DashboardContent({ initialMetrics, user }: DashboardContentProps) {
   const [metrics, setMetrics] = useState<MetricsSummary | null>(initialMetrics);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -80,6 +81,11 @@ export default function DashboardContent({ initialMetrics }: DashboardContentPro
 
   return (
     <div className="space-y-8">
+      {/* User header */}
+      <div className="flex items-center gap-3">
+        <span className="text-slate-300 text-sm">Welcome, {user.name}</span>
+        <span className="bg-blue-600 text-xs px-2 py-1 rounded">{user.role}</span>
+      </div>
       {/* Stat Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {statCards.map(({ label, value, icon: Icon, color }) => (

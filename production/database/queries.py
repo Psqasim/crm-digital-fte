@@ -746,3 +746,44 @@ async def record_metric(
         logger.exception(
             "record_metric failed for metric_name=%s", metric_name
         )
+
+
+# ---------------------------------------------------------------------------
+# User management helpers (Phase 7A — NextAuth RBAC)
+# ---------------------------------------------------------------------------
+
+
+async def get_user_by_email(pool: asyncpg.Pool, email: str) -> dict | None:
+    """Return user row for the given email (case-insensitive), or None if not found."""
+    try:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT id, name, email, hashed_password, role "
+                "FROM users WHERE email = $1",
+                email.lower(),
+            )
+            return _serialize_row(row) if row else None
+    except Exception:
+        logger.exception("get_user_by_email failed for email=%s", email)
+        return None
+
+
+async def create_user(
+    pool: asyncpg.Pool,
+    name: str,
+    email: str,
+    hashed_password: str,
+    role: str,
+) -> dict:
+    """Insert a new user and return id, name, email, role, created_at."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "INSERT INTO users (name, email, hashed_password, role) "
+            "VALUES ($1, $2, $3, $4) "
+            "RETURNING id, name, email, role, created_at",
+            name,
+            email.lower(),
+            hashed_password,
+            role,
+        )
+        return _serialize_row(row)

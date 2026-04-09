@@ -21,14 +21,14 @@
 
 **Purpose**: Verify environment, generate secrets, confirm structure before any code is written
 
-- [ ] T001 Verify src/web-form/ installed packages and confirm next-auth is NOT yet installed
+- [X] T001 Verify src/web-form/ installed packages and confirm next-auth is NOT yet installed
   - **File**: `src/web-form/package.json` (read-only verify)
   - **Acceptance**: Output of `cat src/web-form/package.json` confirms next-auth absent; bcryptjs absent; @neondatabase/serverless absent
   - **Depends**: nothing
   - **Test**: no
   - **Risk**: LOW
 
-- [ ] T002 Generate AUTH_SECRET and add to src/web-form/.env.local and src/web-form/.env.example
+- [X] T002 Generate AUTH_SECRET and add to src/web-form/.env.local and src/web-form/.env.example
   - **File**: `src/web-form/.env.local` (create/update) | `src/web-form/.env.example` (create/update)
   - **Acceptance**: `.env.local` contains `AUTH_SECRET=<32-byte base64 string>`; `.env.example` contains `AUTH_SECRET=` placeholder; neither file is git-tracked (verify `.gitignore` covers `.env.local`)
   - **Depends**: T001
@@ -46,14 +46,14 @@
 
 ### B1: Database Migration (LOW RISK)
 
-- [ ] T003 [P] Create production/database/migrations/004_add_users_table.sql
+- [X] T003 [P] Create production/database/migrations/004_add_users_table.sql
   - **File**: `production/database/migrations/004_add_users_table.sql` (CREATE)
   - **Acceptance**: File contains `CREATE TABLE IF NOT EXISTS users` with columns: `id UUID PK DEFAULT gen_random_uuid()`, `name VARCHAR(255) NOT NULL`, `email VARCHAR(255) UNIQUE NOT NULL`, `hashed_password TEXT NOT NULL`, `role VARCHAR(50) NOT NULL DEFAULT 'agent' CHECK (role IN ('admin','agent'))`, `created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`; plus `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users (email)`; migration is idempotent (IF NOT EXISTS guards)
   - **Depends**: T002
   - **Test**: no (manual: `psql $DATABASE_URL -f 004_add_users_table.sql` must exit 0)
   - **Risk**: LOW
 
-- [ ] T004 [P] Add get_user_by_email() and create_user() async functions to production/database/queries.py
+- [X] T004 [P] Add get_user_by_email() and create_user() async functions to production/database/queries.py
   - **File**: `production/database/queries.py` (UPDATE — append 2 new async functions)
   - **Acceptance**: `get_user_by_email(email: str) -> dict | None` — SELECT id, name, email, hashed_password, role FROM users WHERE email=$1 (lowercased); `create_user(name, email, hashed_password, role) -> dict` — INSERT RETURNING id, name, email, role, created_at; both use existing asyncpg `pool.acquire()` pattern already in file
   - **Depends**: T002 (can run parallel with T003)
@@ -64,7 +64,7 @@
 
 **Risk**: next-auth@beta v5 API differs from v4; peer dep conflicts with Next.js 16 possible; TypeScript types may not resolve. Run `npm run build` after T005, T009, T010.
 
-- [ ] T005 Install next-auth@beta bcryptjs @types/bcryptjs @neondatabase/serverless in src/web-form/ — ⚠️ HIGH RISK
+- [X] T005 Install next-auth@beta bcryptjs @types/bcryptjs @neondatabase/serverless in src/web-form/ — ⚠️ HIGH RISK
   - **File**: `src/web-form/package.json` + `src/web-form/package-lock.json` (UPDATE via npm install)
   - **Command**: `cd src/web-form && npm install next-auth@beta bcryptjs @types/bcryptjs @neondatabase/serverless`
   - **Acceptance**: `npm install` exits 0 with no unresolved peer dependency warnings; `package.json` shows `"next-auth": "^5.x.x-beta.*"`; `npm run build` still passes (166 tests still green)
@@ -72,35 +72,35 @@
   - **Test**: yes — `npm run build` must pass after install
   - **Risk**: HIGH — if peer dep conflicts arise, pin to specific beta version (e.g. `next-auth@5.0.0-beta.25`)
 
-- [ ] T006 Create src/web-form/lib/db.ts with Neon serverless client and DB query functions
+- [X] T006 Create src/web-form/lib/db.ts with Neon serverless client and DB query functions
   - **File**: `src/web-form/lib/db.ts` (CREATE)
   - **Acceptance**: Exports: `DbUser` interface (id, name, email, hashed_password, role, created_at); `getUserByEmail(email: string): Promise<DbUser | null>` — uses tagged template sql\`SELECT...\`; `createUser(name, email, hashedPassword, role): Promise<Omit<DbUser, 'hashed_password'>>` — INSERT RETURNING; uses `neon(process.env.DATABASE_URL!)` from `@neondatabase/serverless`; email lowercased in both functions; `npx tsc --noEmit` passes
   - **Depends**: T005
   - **Test**: no
   - **Risk**: LOW
 
-- [ ] T007 Create src/web-form/auth.config.ts with Credentials provider — ⚠️ HIGH RISK (Edge-safe)
+- [X] T007 Create src/web-form/auth.config.ts with Credentials provider — ⚠️ HIGH RISK (Edge-safe)
   - **File**: `src/web-form/auth.config.ts` (CREATE)
   - **Acceptance**: Exports `authConfig` (type `NextAuthConfig`); contains only `providers: [Credentials({ ... })]`; Credentials provider has `name`, `credentials` (email + password fields), and `authorize` async function that: (1) calls `getUserByEmail(credentials.email)`, (2) calls `bcrypt.compare(credentials.password, user.hashed_password)`, (3) returns `{ id: user.id, email: user.email, name: user.name, role: user.role }` on success or `null` on failure; NO bcrypt import at module level (import inside authorize or use dynamic import to stay Edge-compatible); `npx tsc --noEmit` passes
   - **Depends**: T006
   - **Test**: yes — `npm run build` must pass
   - **Risk**: HIGH — bcrypt import in Edge context must be verified; if Edge errors occur, add `import 'server-only'` guard
 
-- [ ] T008 Create src/web-form/auth.ts with full NextAuth config — ⚠️ HIGH RISK
+- [X] T008 Create src/web-form/auth.ts with full NextAuth config — ⚠️ HIGH RISK
   - **File**: `src/web-form/auth.ts` (CREATE)
   - **Acceptance**: Imports `authConfig` from `./auth.config`; calls `NextAuth({ ...authConfig, session: { strategy: 'jwt' }, pages: { signIn: '/login' }, callbacks: { async jwt({ token, user }) { if (user) { token.role = user.role; token.id = user.id } return token }, async session({ session, token }) { session.user.role = token.role as string; session.user.id = token.id as string; return session } } })`; exports named: `handlers`, `auth`, `signIn`, `signOut`; `npx tsc --noEmit` passes; `auth()` returns null when called without a session
   - **Depends**: T007
   - **Test**: yes — `npm run build` must pass
   - **Risk**: HIGH — v5 export API differs from v4; verify exports match NextAuth v5 docs pattern
 
-- [ ] T009 Create src/web-form/types/next-auth.d.ts with Session/JWT type augmentation — ⚠️ HIGH RISK
+- [X] T009 Create src/web-form/types/next-auth.d.ts with Session/JWT type augmentation — ⚠️ HIGH RISK
   - **File**: `src/web-form/types/next-auth.d.ts` (CREATE)
   - **Acceptance**: Augments `next-auth` module to add `role: string` and `id: string` to `Session["user"]`; augments `next-auth/jwt` to add `role: string` and `id: string` to `JWT`; augments `next-auth` `User` interface to add `role: string`; no TypeScript errors (`npx tsc --noEmit` clean); file is in `src/web-form/types/` directory and picked up by `tsconfig.json`
   - **Depends**: T008
   - **Test**: yes — `npx tsc --noEmit` must pass with zero type errors on auth.ts imports
   - **Risk**: HIGH — if tsconfig doesn't include `types/` directory, add `"typeRoots"` or `"include"` entry to `src/web-form/tsconfig.json`
 
-- [ ] T010 Create src/web-form/app/api/auth/[...nextauth]/route.ts with NextAuth GET+POST handler
+- [X] T010 Create src/web-form/app/api/auth/[...nextauth]/route.ts with NextAuth GET+POST handler
   - **File**: `src/web-form/app/api/auth/[...nextauth]/route.ts` (CREATE — also create directory)
   - **Acceptance**: Imports `{ handlers }` from `@/auth`; exports `const { GET, POST } = handlers`; no custom logic; `npm run build` passes
   - **Depends**: T009
@@ -109,7 +109,7 @@
 
 ### B8: Seed Script (validates DB + bcrypt — must run before proxy.ts testing)
 
-- [ ] T011 Create src/web-form/scripts/seed.ts — idempotent admin seed script
+- [X] T011 Create src/web-form/scripts/seed.ts — idempotent admin seed script
   - **File**: `src/web-form/scripts/seed.ts` (CREATE — also create `scripts/` directory if absent)
   - **Acceptance**: Uses `neon(process.env.DATABASE_URL!)` from `@neondatabase/serverless`; checks if `admin@nexaflow.com` exists in users table; if absent: hashes `Admin123!` with `bcrypt.hash(password, 12)` and INSERTs `(name='NexaFlow Admin', email='admin@nexaflow.com', role='admin')`; logs `"✅ Admin user created"` on creation; logs `"ℹ️ Admin user already exists — skipping"` on second run; run with `npx tsx src/web-form/scripts/seed.ts`; second run produces no DB changes
   - **Depends**: T010 (needs DATABASE_URL and bcryptjs installed)
@@ -128,14 +128,14 @@
 
 ### Implementation for US1
 
-- [ ] T012 [US1] Create src/web-form/app/login/page.tsx — Server Component wrapper
+- [X] T012 [US1] Create src/web-form/app/login/page.tsx — Server Component wrapper
   - **File**: `src/web-form/app/login/page.tsx` (CREATE — create `app/login/` directory)
   - **Acceptance**: Server Component; calls `auth()` — if session exists redirects to `/admin/dashboard` (admin) or `/dashboard` (agent) using `redirect()`; if no session renders `<LoginForm />`; page title "NexaFlow Login"; background `bg-[#0F172A]`; no "Create Account" or "Forgot Password" links anywhere on the page
   - **Depends**: T010 (auth.ts available), T011 (seed complete — admin credentials exist)
   - **Test**: no
   - **Risk**: LOW
 
-- [ ] T013 [US1] Create src/web-form/app/login/LoginForm.tsx — Client Component with form + validation
+- [X] T013 [US1] Create src/web-form/app/login/LoginForm.tsx — Client Component with form + validation
   - **File**: `src/web-form/app/login/LoginForm.tsx` (CREATE)
   - **Acceptance**: `'use client'` directive; uses `react-hook-form` with `zodResolver`; Zod schema validates: email (required, valid email format), password (required, min 1 char for display purposes — server validates credentials); form submits via Server Action calling `signIn('credentials', { email, password, redirect: false })`; on `error` from signIn: displays inline red text "Invalid email or password" below submit button; on success: `router.push('/admin/dashboard')` for admin or `router.push('/dashboard')` for agent (read role from session via `useSession()` or refetch); shadcn `Input` components; submit button `bg-[#3B82F6] hover:bg-[#2563EB]`; card `bg-slate-800/50 border-slate-700 max-w-sm mx-auto mt-20`
   - **Depends**: T012
@@ -154,7 +154,7 @@
 
 ### Implementation for US2
 
-- [ ] T014 [US2] Create src/web-form/proxy.ts — ⚠️ HIGH RISK (NOT middleware.ts — Next.js 16 rename)
+- [X] T014 [US2] Create src/web-form/proxy.ts — ⚠️ HIGH RISK (NOT middleware.ts — Next.js 16 rename)
   - **File**: `src/web-form/proxy.ts` (CREATE — filename is `proxy.ts`, NOT `middleware.ts`)
   - **Acceptance**:
     - File is named exactly `proxy.ts` (verify: `ls src/web-form/proxy.ts` must succeed; `ls src/web-form/middleware.ts` must fail)
@@ -183,21 +183,21 @@
 
 ### Implementation for US3
 
-- [ ] T015 [P] [US3] Create src/web-form/app/admin/dashboard/page.tsx — Server Component with auth check + FastAPI tickets fetch
+- [X] T015 [P] [US3] Create src/web-form/app/admin/dashboard/page.tsx — Server Component with auth check + FastAPI tickets fetch
   - **File**: `src/web-form/app/admin/dashboard/page.tsx` (CREATE — create `app/admin/dashboard/` directory)
   - **Acceptance**: Server Component; calls `auth()` — if no session or `session.user.role !== 'admin'` calls `redirect('/login')` (belt-and-suspenders beyond proxy); fetches tickets from FastAPI: `fetch(\`${process.env.FASTAPI_URL}/api/tickets\`, { cache: 'no-store' })` — SAME pattern as existing `/dashboard/page.tsx`; passes `tickets` array and `session.user` to `<AdminDashboardContent>`; handles fetch error gracefully (empty array + console.error); page title "Admin Dashboard — NexaFlow"
   - **Depends**: T014 (proxy.ts in place)
   - **Test**: no
   - **Risk**: MEDIUM — uses FastAPI for tickets (existing pattern); if FastAPI is down, show empty state not error page
 
-- [ ] T016 [P] [US3] Create src/web-form/app/admin/dashboard/AdminDashboardContent.tsx — Client Component with tickets table + create user form
+- [X] T016 [P] [US3] Create src/web-form/app/admin/dashboard/AdminDashboardContent.tsx — Client Component with tickets table + create user form
   - **File**: `src/web-form/app/admin/dashboard/AdminDashboardContent.tsx` (CREATE)
   - **Acceptance**: `'use client'` directive; receives `tickets: Ticket[]` and `user: { name, role }` as props; renders: (1) tickets table with columns: Ticket ID, Channel, Category, Priority, Status, Timestamp — same display as existing dashboard; (2) "Create User" form with fields: Full Name (text), Email (email), Password (password), Role (select: admin | agent); form uses `react-hook-form` + Zod validation (name ≥2 chars, valid email, password ≥8 chars, role required); on submit: POST to `/api/admin/users` with JSON body; on 201: show success toast "User created successfully"; on 409: show inline error "Email already exists"; on 400: show inline validation errors; on 401/403: show "Permission denied" (should not happen given proxy + server guard)
   - **Depends**: T015 (can be written in parallel — different file)
   - **Test**: no
   - **Risk**: MEDIUM — two distinct data sources must not be mixed; tickets come from props (FastAPI via Server Component); user creation POSTs to Next.js API route (not FastAPI)
 
-- [ ] T017 [US3] Create src/web-form/app/api/admin/users/route.ts — POST handler (admin-only user creation)
+- [X] T017 [US3] Create src/web-form/app/api/admin/users/route.ts — POST handler (admin-only user creation)
   - **File**: `src/web-form/app/api/admin/users/route.ts` (CREATE — create `app/api/admin/users/` directory)
   - **Acceptance**: `export async function POST(req: Request)` (no GET); step-by-step:
     1. `const session = await auth()` — if null → 401 `{ error: 'Unauthorized' }`
@@ -223,14 +223,14 @@
 
 ### Implementation for US4
 
-- [ ] T018 [P] [US4] Update src/web-form/app/dashboard/page.tsx — add auth() call and belt-and-suspenders redirect
+- [X] T018 [P] [US4] Update src/web-form/app/dashboard/page.tsx — add auth() call and belt-and-suspenders redirect
   - **File**: `src/web-form/app/dashboard/page.tsx` (UPDATE)
   - **Acceptance**: Adds `const session = await auth()` at top of page function; if `!session` → `redirect('/login')`; passes `session.user` to dashboard content component; existing ticket data fetch from FastAPI is UNCHANGED; no other modifications to the file; `npm run build` passes; existing ticket metrics display is regression-free
   - **Depends**: T017
   - **Test**: no
   - **Risk**: LOW
 
-- [ ] T019 [P] [US4] Update src/web-form/app/dashboard/DashboardContent.tsx — add user name + role badge in header
+- [X] T019 [P] [US4] Update src/web-form/app/dashboard/DashboardContent.tsx — add user name + role badge in header
   - **File**: `src/web-form/app/dashboard/DashboardContent.tsx` (UPDATE — locate existing file)
   - **Acceptance**: Accepts `user: { name: string, role: string }` prop (add to existing props interface); renders user name and role badge in dashboard header — e.g. "Welcome, {user.name}" + `<span className="bg-blue-600 text-xs px-2 py-1 rounded">{user.role}</span>`; all existing dashboard content (ticket metrics, recent tickets table) is UNCHANGED and regression-free
   - **Depends**: T018 (can be written in parallel — different file)
@@ -249,7 +249,7 @@
 
 ### Implementation for US5
 
-- [ ] T020 [US5] Update src/web-form/components/Navbar.tsx — make async Server Component with auth-aware links
+- [X] T020 [US5] Update src/web-form/components/Navbar.tsx — make async Server Component with auth-aware links
   - **File**: `src/web-form/components/Navbar.tsx` (UPDATE)
   - **Acceptance**: Convert to async Server Component (`export default async function Navbar()`); add `const session = await auth()` at top; conditional rendering:
     - No session: render "Login" button → `<Link href="/login">Login</Link>` only (no dashboard/admin links)
@@ -271,21 +271,21 @@
 
 **Purpose**: Build verification, smoke tests, and final commit
 
-- [ ] T021 Run npm run build in src/web-form/ and resolve any TypeScript or build errors
+- [X] T021 Run npm run build in src/web-form/ and resolve any TypeScript or build errors
   - **File**: `src/web-form/` (build check — no file changes unless errors found)
   - **Acceptance**: `cd src/web-form && npm run build` exits 0 with no TypeScript errors and no missing module errors; if errors exist: fix them in the relevant file before proceeding
   - **Depends**: T020
   - **Test**: yes — this IS the test
   - **Risk**: LOW
 
-- [ ] T022 Run quickstart.md smoke tests end-to-end (seed → login → route protection → admin dashboard → logout)
+- [X] T022 Run quickstart.md smoke tests end-to-end (seed → login → route protection → admin dashboard → logout)
   - **File**: `specs/011-auth/quickstart.md` (reference only)
   - **Acceptance**: All scenarios in quickstart.md pass manually: (1) seed script idempotent; (2) admin login → `/admin/dashboard` reachable; (3) agent login → `/dashboard` reachable; (4) unauthenticated `/dashboard` → 302 `/login`; (5) agent `/admin/dashboard` → 302 `/dashboard`; (6) admin creates new agent → new agent can log in; (7) Logout clears session; (8) public routes `/`, `/support`, `/ticket/*` load without auth
   - **Depends**: T021
   - **Test**: yes (manual smoke)
   - **Risk**: LOW
 
-- [ ] T023 Commit all changes on branch 011-auth (do NOT push)
+- [X] T023 Commit all changes on branch 011-auth (do NOT push)
   - **File**: all created/modified files in `src/web-form/`, `production/database/`, `specs/011-auth/`
   - **Acceptance**: `git status` shows no uncommitted changes after commit; commit message follows conventional commit format: `feat(auth): Phase 7A — NextAuth.js v5 auth + RBAC`; branch remains `011-auth`; NOT pushed to remote
   - **Depends**: T022
