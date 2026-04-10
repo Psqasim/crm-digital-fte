@@ -338,10 +338,10 @@ TWILIO_WHATSAPP_NUMBER=
 ```
 
 ## Recent Changes
+- 012-chat-agent: Added Python 3.12 (backend) + TypeScript 5 / Next.js 16.2.2 (frontend)
 - 011-auth: Added TypeScript / Next.js 16.2.2 (App Router) + next-auth@beta (v5), bcryptjs, @neondatabase/serverless, zod (already installed), react-hook-form (already installed)
 - 006-production-agent: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
-- 003-mcp-server (Phase 2E implementation complete): Added `src/agent/skills_manifest.py` (SkillManifest dataclass + 5 skill constants), `src/agent/skills_registry.py` (SkillsRegistry with get_skill/list_skills), `src/agent/skills_invoker.py` (full pipeline invoker — CustomerIdentification→Sentiment→KB→Escalation→ChannelAdaptation). Wired `src/agent/prototype.py::process_ticket` through SkillsInvoker. Added `tests/test_skills.py` (22 tests). Full suite: 101/101 passing.
 
 ## Active Technologies
-- TypeScript / Next.js 16.2.2 (App Router) + next-auth@beta (v5), bcryptjs, @neondatabase/serverless, zod (already installed), react-hook-form (already installed) (011-auth)
-- Neon PostgreSQL 16 (existing connection via `DATABASE_URL` env var) (011-auth)
+- Python 3.12 (backend) + TypeScript 5 / Next.js 16.2.2 (frontend) (012-chat-agent)
+- In-memory `dict[str, ChatSession]` (ephemeral) + existing Neon pgvector (read-only KB search) (012-chat-agent)
