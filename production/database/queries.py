@@ -337,13 +337,15 @@ async def get_ticket_by_display_id(
                     "       t.status, t.category, t.priority, t.subject, "
                     "       t.created_at, t.updated_at, t.resolved_at, "
                     "       c.name AS customer_name, c.email AS customer_email, "
-                    "       m.content AS body "
+                    "       cust_msg.content AS body "
                     "FROM tickets t "
                     "JOIN customers c ON c.id = t.customer_id "
-                    "LEFT JOIN messages m ON m.conversation_id = t.conversation_id "
-                    "  AND m.role = 'customer' "
+                    "LEFT JOIN LATERAL ("
+                    "  SELECT content FROM messages "
+                    "  WHERE conversation_id = t.conversation_id AND role = 'customer' "
+                    "  ORDER BY created_at ASC LIMIT 1"
+                    ") cust_msg ON true "
                     "WHERE upper(substring(t.id::text, 1, 8)) = $1 "
-                    "ORDER BY m.created_at ASC "
                     "LIMIT 1",
                     suffix,
                 )
@@ -353,13 +355,15 @@ async def get_ticket_by_display_id(
                     "       t.status, t.category, t.priority, t.subject, "
                     "       t.created_at, t.updated_at, t.resolved_at, "
                     "       c.name AS customer_name, c.email AS customer_email, "
-                    "       m.content AS body "
+                    "       cust_msg.content AS body "
                     "FROM tickets t "
                     "JOIN customers c ON c.id = t.customer_id "
-                    "LEFT JOIN messages m ON m.conversation_id = t.conversation_id "
-                    "  AND m.role = 'customer' "
+                    "LEFT JOIN LATERAL ("
+                    "  SELECT content FROM messages "
+                    "  WHERE conversation_id = t.conversation_id AND role = 'customer' "
+                    "  ORDER BY created_at ASC LIMIT 1"
+                    ") cust_msg ON true "
                     "WHERE t.id::text = $1 "
-                    "ORDER BY m.created_at ASC "
                     "LIMIT 1",
                     ticket_id,
                 )
@@ -367,16 +371,31 @@ async def get_ticket_by_display_id(
                 return None
             internal_id = str(row["id"])
             display_id = "TKT-" + internal_id[:8].upper()
+            conv_id = str(row["conversation_id"]) if row["conversation_id"] else None
+
+            # Fetch latest AI reply for this conversation
+            ai_response: str | None = None
+            if conv_id:
+                ai_row = await conn.fetchrow(
+                    "SELECT content FROM messages "
+                    "WHERE conversation_id = $1 AND role = 'assistant' "
+                    "ORDER BY created_at DESC LIMIT 1",
+                    row["conversation_id"],
+                )
+                if ai_row:
+                    ai_response = ai_row["content"]
+
             return {
                 "ticket_id": display_id,
                 "internal_id": internal_id,
-                "conversation_id": str(row["conversation_id"]) if row["conversation_id"] else None,
+                "conversation_id": conv_id,
                 "customer_id": str(row["customer_id"]) if row["customer_id"] else None,
                 "status": row["status"],
                 "category": row["category"],
                 "priority": row["priority"],
                 "subject": row["subject"],
                 "message": row["body"],
+                "ai_response": ai_response,
                 "customer_name": row["customer_name"],
                 "customer_email": row["customer_email"],
                 "created_at": row["created_at"],
@@ -491,6 +510,44 @@ async def get_metrics_summary(
             "channels": {},
             "recent_tickets": [],
         }
+
+
+async def get_tickets_by_email(
+    pool: asyncpg.Pool,
+    email: str,
+) -> list[dict]:
+    """Return tickets submitted by a customer with the given email address.
+
+    Returns list of dicts with ticket_id, status, category, priority, subject,
+    created_at, updated_at — sorted newest first.
+    """
+    try:
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT t.id, t.status, t.category, t.priority, t.subject, "
+                "       t.created_at, t.updated_at "
+                "FROM tickets t "
+                "JOIN customers c ON c.id = t.customer_id "
+                "WHERE c.email = $1 "
+                "ORDER BY t.created_at DESC "
+                "LIMIT 50",
+                email.lower(),
+            )
+            return [
+                {
+                    "ticket_id": "TKT-" + str(r["id"])[:8].upper(),
+                    "status": r["status"],
+                    "category": r["category"],
+                    "priority": r["priority"],
+                    "subject": r["subject"],
+                    "created_at": r["created_at"].isoformat() if hasattr(r["created_at"], "isoformat") else r["created_at"],
+                    "updated_at": r["updated_at"].isoformat() if r["updated_at"] and hasattr(r["updated_at"], "isoformat") else r["updated_at"],
+                }
+                for r in rows
+            ]
+    except Exception:
+        logger.exception("get_tickets_by_email failed for email=%s", email)
+        return []
 
 
 async def get_channel_metrics(

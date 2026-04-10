@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import "./globals.css";
 
 const inter = Inter({
@@ -34,9 +32,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-[#0F172A]">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-          <Navbar />
           {children}
-          <Footer />
           <Toaster />
         </ThemeProvider>
       </body>

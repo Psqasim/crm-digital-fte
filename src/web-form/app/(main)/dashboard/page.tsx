@@ -6,11 +6,7 @@ import DashboardContent from "./DashboardContent";
 
 export const metadata: Metadata = {
   title: "Support Dashboard | NexaFlow",
-  description: "Real-time support metrics and ticket management",
-  openGraph: {
-    title: "Support Dashboard | NexaFlow",
-    description: "Real-time support metrics and ticket management",
-  },
+  description: "All tickets — real-time support metrics",
 };
 
 export default async function DashboardPage() {
@@ -20,22 +16,22 @@ export default async function DashboardPage() {
   let initialMetrics: MetricsSummary | null = null;
   try {
     const fastapiUrl = process.env.FASTAPI_URL ?? "http://localhost:8000";
-    const res = await fetch(`${fastapiUrl}/metrics/summary`, {
-      cache: "no-store",
-    });
+    const res = await fetch(`${fastapiUrl}/metrics/summary`, { cache: "no-store" });
     if (res.ok) initialMetrics = await res.json();
   } catch {
-    // Client will fetch on mount
+    // client will retry on mount
   }
 
   return (
-    <main className="min-h-screen bg-[#0F172A] text-white py-12 px-4">
+    <main className="min-h-screen bg-[#0F172A] text-white py-10 px-4">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold mb-2">Support Dashboard</h1>
-        <p className="text-slate-400 mb-8">
-          Welcome, {session.user.name}{" "}
-          <span className="bg-blue-600 text-xs px-2 py-1 rounded">{session.user.role}</span>
-        </p>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-white">Support Dashboard</h1>
+          <p className="text-slate-400 mt-1 text-sm">
+            Welcome back, {session.user.name}
+            <span className="ml-2 bg-blue-600 text-xs px-2 py-0.5 rounded">{session.user.role}</span>
+          </p>
+        </div>
         <DashboardContent initialMetrics={initialMetrics} user={{ name: session.user.name ?? "", role: session.user.role }} />
       </div>
     </main>

@@ -5,7 +5,7 @@ Phase 4C: Web form FastAPI router — submit, ticket lookup, metrics.
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
 from production.channels.web_form_handler import WebFormInput, submit_ticket
@@ -60,6 +60,23 @@ async def get_ticket(ticket_id: str) -> JSONResponse:
         for k, v in ticket.items()
     }
     return JSONResponse(serialised, status_code=200)
+
+
+# ---------------------------------------------------------------------------
+# GET /support/tickets?email={email}
+# ---------------------------------------------------------------------------
+
+
+@router.get("/support/tickets")
+async def get_tickets_by_email(
+    email: str = Query(..., description="Customer email address"),
+) -> JSONResponse:
+    """Return all tickets submitted by a customer email address."""
+    if not email or "@" not in email:
+        return JSONResponse({"detail": "Valid email parameter required"}, status_code=400)
+    pool = await _pool()
+    tickets = await queries.get_tickets_by_email(pool, email)
+    return JSONResponse(tickets, status_code=200, headers={"Cache-Control": "no-store"})
 
 
 # ---------------------------------------------------------------------------

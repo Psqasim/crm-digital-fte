@@ -8,6 +8,7 @@ export interface TicketData {
   priority: string;
   subject: string | null;
   message: string | null;
+  ai_response: string | null;
   customer_name: string;
   customer_email: string;
   created_at: string;

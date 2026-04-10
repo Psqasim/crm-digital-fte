@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import confetti from "canvas-confetti";
 import { toast } from "sonner";
+import { Copy, CheckCheck, ExternalLink, RotateCcw, Ticket } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -29,10 +30,6 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import SlideUp from "@/components/animations/SlideUp";
 
-// ---------------------------------------------------------------------------
-// Zod schema
-// ---------------------------------------------------------------------------
-
 export const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Enter a valid email"),
@@ -51,13 +48,89 @@ export const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+function TicketSuccessCard({ ticketId, onReset }: { ticketId: string; onReset: () => void }) {
+  const router = useRouter();
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(ticketId);
+    setCopied(true);
+    toast.success("Ticket ID copied!");
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <SlideUp delay={0.05}>
+      <Card className="bg-slate-900/50 border-slate-700">
+        <CardContent className="p-6 sm:p-8 text-center space-y-6">
+          {/* Icon */}
+          <div className="flex justify-center">
+            <div className="w-16 h-16 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center">
+              <Ticket className="w-8 h-8 text-green-400" />
+            </div>
+          </div>
+
+          {/* Title */}
+          <div>
+            <h2 className="text-xl font-bold text-white mb-1">Ticket Submitted!</h2>
+            <p className="text-slate-400 text-sm">
+              Your ticket is queued. AI will analyze it within ~30 seconds.
+            </p>
+          </div>
+
+          {/* Ticket ID block */}
+          <div className="bg-slate-800 border border-slate-600 rounded-xl p-4 space-y-3">
+            <p className="text-slate-400 text-xs uppercase tracking-wide">Your Ticket ID</p>
+            <p className="font-mono text-2xl font-bold text-[#3B82F6] tracking-wider">
+              {ticketId}
+            </p>
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-2 mx-auto text-sm bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              {copied ? (
+                <><CheckCheck className="w-4 h-4 text-green-400" /> Copied!</>
+              ) : (
+                <><Copy className="w-4 h-4" /> Copy Ticket ID</>
+              )}
+            </button>
+          </div>
+
+          {/* Warning */}
+          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-4 py-3 text-left">
+            <p className="text-yellow-400 text-xs font-medium mb-0.5">Save this ID</p>
+            <p className="text-slate-400 text-xs">
+              You&apos;ll need it to check your ticket status. Bookmark the link or copy the ID now.
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button
+              onClick={() => router.push(`/ticket/${ticketId}`)}
+              className="flex-1 bg-[#3B82F6] hover:bg-[#2563EB] text-white font-semibold gap-2"
+            >
+              <ExternalLink className="w-4 h-4" />
+              View Ticket Status
+            </Button>
+            <Button
+              variant="outline"
+              onClick={onReset}
+              className="flex-1 border-slate-600 text-slate-300 hover:text-white hover:bg-slate-800 gap-2"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Submit Another
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </SlideUp>
+  );
+}
 
 export default function SupportForm() {
-  const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [submittedTicketId, setSubmittedTicketId] = useState<string | null>(null);
   const confettiFired = useRef(false);
 
   const form = useForm<FormValues>({
@@ -90,7 +163,6 @@ export default function SupportForm() {
       if (res.ok) {
         const ticketId: string = json.ticket_id;
 
-        // Fire confetti exactly once
         if (!confettiFired.current) {
           confettiFired.current = true;
           confetti({
@@ -101,16 +173,7 @@ export default function SupportForm() {
           });
         }
 
-        toast.success(`Ticket created! ID: ${ticketId}`, {
-          action: {
-            label: "View",
-            onClick: () => router.push(`/ticket/${ticketId}`),
-          },
-        });
-
-        setTimeout(() => {
-          router.push(`/ticket/${ticketId}`);
-        }, 2000);
+        setSubmittedTicketId(ticketId);
       } else {
         toast.error(json.detail ?? "Submission failed. Please try again.");
         setSubmitting(false);
@@ -120,6 +183,16 @@ export default function SupportForm() {
       setSubmitting(false);
     }
   };
+
+  const handleReset = () => {
+    setSubmittedTicketId(null);
+    setSubmitting(false);
+    form.reset();
+  };
+
+  if (submittedTicketId) {
+    return <TicketSuccessCard ticketId={submittedTicketId} onReset={handleReset} />;
+  }
 
   return (
     <SlideUp delay={0.1}>
@@ -185,7 +258,7 @@ export default function SupportForm() {
                 )}
               />
 
-              {/* Category + Priority side by side on sm+ */}
+              {/* Category + Priority */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -193,10 +266,7 @@ export default function SupportForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-slate-200">Category</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger className="bg-slate-800 border-slate-600 text-white focus:ring-[#3B82F6] min-h-[44px]">
                             <SelectValue placeholder="Select category" />
@@ -220,10 +290,7 @@ export default function SupportForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-slate-200">Priority</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger className="bg-slate-800 border-slate-600 text-white focus:ring-[#3B82F6] min-h-[44px]">
                             <SelectValue placeholder="Select priority" />
@@ -261,9 +328,7 @@ export default function SupportForm() {
                       <FormMessage />
                       <span
                         className={`text-xs ml-auto ${
-                          messageLength >= 1800
-                            ? "text-red-400 font-medium"
-                            : "text-slate-500"
+                          messageLength >= 1800 ? "text-red-400 font-medium" : "text-slate-500"
                         }`}
                       >
                         {messageLength}/2000
@@ -273,7 +338,6 @@ export default function SupportForm() {
                 )}
               />
 
-              {/* Submit */}
               <Button
                 type="submit"
                 disabled={submitting}

@@ -372,11 +372,40 @@ T019: Update DashboardContent.tsx
 
 ---
 
+---
+
+## Phase 9: UI/UX Polish (Post-implementation additions — 2026-04-10)
+
+**Purpose**: Professional CRM-grade UI — login without Navbar/Footer, route group restructure, auth-aware footer
+
+- [X] T024 Restructure app/ into (auth) and (main) route groups — login has no Navbar/Footer
+  - **File**: `src/web-form/app/(auth)/layout.tsx` (CREATE) | `src/web-form/app/(main)/layout.tsx` (CREATE) | `src/web-form/app/layout.tsx` (UPDATE — remove Navbar/Footer)
+  - **Acceptance**: `/login` renders with NO Navbar or Footer; all other routes (`/`, `/dashboard`, `/admin/dashboard`, `/support`) retain Navbar + Footer; `npm run build` 0 errors; all 5 smoke tests pass
+  - **Depends**: T020
+  - **Test**: yes — `curl -sI /login` returns 200 with no nav markup; `/dashboard` still has nav
+  - **Risk**: LOW
+
+- [X] T025 Redesign login page — professional split-screen CRM UI
+  - **File**: `src/web-form/app/(auth)/login/page.tsx` (UPDATE) | `src/web-form/app/(auth)/login/LoginForm.tsx` (UPDATE)
+  - **Acceptance**: Left panel: NexaFlow brand, tagline, 3 feature bullets with icons; Right panel: email + password fields with icons, password show/hide toggle, loading spinner, error banner; No "Create Account" or "Forgot Password" links; Responsive (left panel hidden on mobile); `npm run build` 0 errors
+  - **Depends**: T024
+  - **Test**: no (manual — visual)
+  - **Risk**: LOW
+
+- [X] T026 Update Footer to auth-aware Server Component — role-based nav links
+  - **File**: `src/web-form/components/Footer.tsx` (UPDATE)
+  - **Acceptance**: Footer is async Server Component calling `auth()`; shows Admin link only when `role === 'admin'`; shows Dashboard link only when `role === 'agent'`; hardcoded `/dashboard` link removed; GitHub + Home + Get Support links always visible
+  - **Depends**: T024
+  - **Test**: no (manual — visual)
+  - **Risk**: LOW
+
+---
+
 ## Summary
 
 | Metric | Count |
 |--------|-------|
-| Total tasks | 23 |
+| Total tasks | 26 |
 | Phase 1 Setup | 2 |
 | Phase 2 Foundational (B1+B2+B8) | 9 |
 | Phase 3 US1 Login (B4) | 2 |
@@ -385,5 +414,6 @@ T019: Update DashboardContent.tsx
 | Phase 6 US4 Agent Dashboard (B6) | 2 |
 | Phase 7 US5 Navbar (B7) | 1 |
 | Phase 8 Polish | 3 |
+| Phase 9 UI/UX Polish | 3 |
 | **HIGH RISK tasks** | **5** (T005, T007, T008, T009, T014) |
 | Parallel opportunities | 3 groups (T003+T004, T015+T016, T018+T019) |
