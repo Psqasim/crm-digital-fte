@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef, useState, KeyboardEvent } from "react";
-import { ChevronDown, X, Trash2, Send, Zap } from "lucide-react";
+import { ChevronDown, X, Trash2, Send, Bot } from "lucide-react";
 import ChatMessage from "./ChatMessage";
 import { useChatSession } from "@/hooks/useChatSession";
 
@@ -93,7 +93,7 @@ export default function ChatPanel({ onClose, onMinimize }: ChatPanelProps) {
       {/* ------------------------------------------------------------------ */}
       <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-slate-800 to-slate-900 border-b border-slate-700 rounded-t-2xl flex-shrink-0">
         <div className="flex items-center gap-2">
-          <Zap className="w-4 h-4 text-blue-400" />
+          <Bot className="w-4 h-4 text-blue-400" />
           <span className="text-sm font-semibold text-white">NexaFlow AI Support</span>
           <span className="flex items-center gap-1 text-xs text-emerald-400">
             <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" />
@@ -157,19 +157,27 @@ export default function ChatPanel({ onClose, onMinimize }: ChatPanelProps) {
         {/* Typing indicator */}
         {isLoading && <TypingIndicator />}
 
-        {/* Suggestion chips — shown only when just greeting is visible */}
+        {/* Empty state — shown only when just the greeting is visible */}
         {isOnlyGreeting && !isLoading && (
-          <div className="flex flex-col items-center gap-3 mt-6">
-            <Zap className="w-10 h-10 text-blue-500 opacity-80" />
-            <p className="text-slate-400 text-sm text-center">
-              Hi! How can I help you today?
-            </p>
-            <div className="flex flex-wrap gap-2 justify-center">
+          <div className="flex flex-col items-center gap-3 mt-4 px-4">
+            {/* Bot icon */}
+            <div className="w-16 h-16 bg-blue-600/20 border border-blue-500/30 rounded-2xl flex items-center justify-center">
+              <Bot className="w-9 h-9 text-blue-400" />
+            </div>
+            {/* Title + subtitle */}
+            <div className="text-center">
+              <h3 className="text-white font-semibold text-base">NexaFlow AI</h3>
+              <p className="text-slate-400 text-sm mt-0.5">
+                Intelligent support, powered by AI
+              </p>
+            </div>
+            {/* Suggestion chips */}
+            <div className="flex flex-wrap gap-2 justify-center mt-1">
               {SUGGESTIONS.map((s) => (
                 <button
                   key={s}
                   onClick={() => handleSuggestion(s)}
-                  className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 hover:text-white px-3 py-1.5 rounded-full transition-colors"
+                  className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600/60 text-slate-300 hover:text-white px-3 py-1.5 rounded-full transition-colors"
                 >
                   {s}
                 </button>
