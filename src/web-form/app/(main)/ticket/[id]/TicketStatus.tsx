@@ -2,16 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import type { TicketData } from "@/lib/types";
+import type { TicketData, TicketMessage } from "@/lib/types";
 import StatusBadge from "@/components/StatusBadge";
 import { TicketStatusSkeleton } from "@/components/LoadingSkeleton";
 import { Badge } from "@/components/ui/badge";
 import FadeIn from "@/components/animations/FadeIn";
-import { Bot, AlertTriangle, Copy, CheckCheck } from "lucide-react";
+import { Bot, AlertTriangle, Copy, CheckCheck, UserCircle, Send } from "lucide-react";
 
 interface TicketStatusProps {
   initialData: TicketData | null;
   ticketId: string;
+  userRole?: string | null;
 }
 
 const PKT = new Intl.DateTimeFormat("en-US", {
@@ -42,15 +43,176 @@ function CopyButton({ text }: { text: string }) {
       onClick={handle}
       className="flex items-center gap-1 text-xs text-slate-400 hover:text-white bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded transition-colors"
     >
-      {copied ? <><CheckCheck className="w-3 h-3 text-green-400" />Copied</> : <><Copy className="w-3 h-3" />Copy ID</>}
+      {copied ? (
+        <>
+          <CheckCheck className="w-3 h-3 text-green-400" />Copied
+        </>
+      ) : (
+        <>
+          <Copy className="w-3 h-3" />Copy ID
+        </>
+      )}
     </button>
   );
 }
 
-export default function TicketStatus({ initialData, ticketId }: TicketStatusProps) {
+// ─── Message thread bubble ────────────────────────────────────────────────────
+
+function MessageBubble({ msg }: { msg: TicketMessage }) {
+  const isCustomer = msg.role === "customer";
+  const isHumanAgent = msg.is_human_agent; // role="agent"
+  const isAI = msg.role === "assistant";
+
+  if (isCustomer) {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[85%]">
+          <div className="bg-blue-600 text-white px-4 py-2.5 rounded-2xl rounded-br-sm text-sm break-words">
+            {msg.content}
+          </div>
+          <p className="text-slate-500 text-xs mt-1 text-right">{formatPKT(msg.created_at)}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isHumanAgent) {
+    return (
+      <div className="flex justify-start">
+        <div className="max-w-[85%]">
+          <div className="flex items-center gap-1.5 mb-1">
+            <UserCircle className="w-3.5 h-3.5 text-teal-400" />
+            <span className="text-teal-400 text-xs font-medium">Support Agent</span>
+          </div>
+          <div className="bg-slate-700 border border-teal-500/30 text-slate-100 px-4 py-2.5 rounded-2xl rounded-bl-sm text-sm break-words">
+            {msg.content}
+          </div>
+          <p className="text-slate-500 text-xs mt-1">{formatPKT(msg.created_at)}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAI) {
+    return (
+      <div className="flex justify-start">
+        <div className="max-w-[85%]">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Bot className="w-3.5 h-3.5 text-blue-400" />
+            <span className="text-blue-400 text-xs font-medium">AI Response</span>
+          </div>
+          <div className="bg-slate-700 border border-blue-500/20 text-slate-100 px-4 py-2.5 rounded-2xl rounded-bl-sm text-sm break-words whitespace-pre-wrap">
+            {msg.content}
+          </div>
+          <p className="text-slate-500 text-xs mt-1">{formatPKT(msg.created_at)}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+// ─── Agent reply box ──────────────────────────────────────────────────────────
+
+function AgentReplyBox({
+  ticketId,
+  onReplySent,
+}: {
+  ticketId: string;
+  onReplySent: () => void;
+}) {
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const handleSend = async () => {
+    const trimmed = text.trim();
+    if (!trimmed || sending) return;
+    setSending(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      const res = await fetch("/api/agent-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticket_id: ticketId, message: trimmed }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setError(json.error ?? "Failed to send reply");
+        return;
+      }
+      setText("");
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+      onReplySent();
+    } catch {
+      setError("Network error — please try again");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  return (
+    <div className="bg-slate-800/60 border border-teal-500/20 rounded-lg p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <UserCircle className="w-4 h-4 text-teal-400" />
+        <p className="text-teal-400 text-sm font-medium">Reply as Agent</p>
+      </div>
+
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder="Type your reply to the customer… (Enter to send, Shift+Enter for new line)"
+        rows={3}
+        className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 resize-none focus:outline-none focus:border-teal-500 transition-colors"
+      />
+
+      <div className="flex items-center justify-between mt-2">
+        <span className="text-slate-500 text-xs">{text.length}/1000 chars</span>
+        <div className="flex items-center gap-2">
+          {success && (
+            <span className="text-green-400 text-xs flex items-center gap-1">
+              <CheckCheck className="w-3 h-3" /> Sent
+            </span>
+          )}
+          {error && <span className="text-red-400 text-xs">{error}</span>}
+          <button
+            onClick={handleSend}
+            disabled={!text.trim() || sending || text.length > 1000}
+            className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm px-4 py-1.5 rounded-lg transition-colors"
+          >
+            <Send className="w-3.5 h-3.5" />
+            {sending ? "Sending…" : "Send Reply"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export default function TicketStatus({
+  initialData,
+  ticketId,
+  userRole,
+}: TicketStatusProps) {
   const [ticket, setTicket] = useState<TicketData | null>(initialData);
   const [notFound, setNotFound] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const isStaff = userRole === "admin" || userRole === "agent";
 
   const fetchTicket = async () => {
     try {
@@ -63,7 +225,7 @@ export default function TicketStatus({ initialData, ticketId }: TicketStatusProp
       if (res.ok) {
         const json: TicketData = await res.json();
         setTicket(json);
-        if (TERMINAL.has(json.status)) {
+        if (TERMINAL.has(json.status) && !isStaff) {
           if (intervalRef.current) clearInterval(intervalRef.current);
         }
       }
@@ -73,7 +235,7 @@ export default function TicketStatus({ initialData, ticketId }: TicketStatusProp
   };
 
   useEffect(() => {
-    if (ticket && TERMINAL.has(ticket.status)) return;
+    if (ticket && TERMINAL.has(ticket.status) && !isStaff) return;
     intervalRef.current = setInterval(fetchTicket, 5000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
@@ -105,6 +267,9 @@ export default function TicketStatus({ initialData, ticketId }: TicketStatusProp
   const isActive = ticket.status === "open" || ticket.status === "in_progress";
   const isResolved = ticket.status === "resolved";
   const isEscalated = ticket.status === "escalated";
+
+  // Show message thread if we have structured messages; otherwise fall back to legacy view
+  const hasMessageThread = ticket.messages && ticket.messages.length > 0;
 
   return (
     <FadeIn>
@@ -178,29 +343,42 @@ export default function TicketStatus({ initialData, ticketId }: TicketStatusProp
           )}
         </div>
 
-        {/* Customer message */}
-        {ticket.message && (
+        {/* Message thread (structured) — shows all customer, AI, agent messages */}
+        {hasMessageThread ? (
           <div>
-            <p className="text-slate-400 text-sm mb-2">Your message</p>
-            <pre className="whitespace-pre-wrap font-sans bg-slate-800 border border-slate-700 p-4 rounded-lg text-slate-200 text-sm">
-              {ticket.message}
-            </pre>
+            <p className="text-slate-400 text-sm mb-3">Conversation</p>
+            <div className="space-y-3 bg-slate-800/30 border border-slate-700 rounded-lg p-4">
+              {ticket.messages!.map((msg, i) => (
+                <MessageBubble key={i} msg={msg} />
+              ))}
+            </div>
           </div>
-        )}
+        ) : (
+          <>
+            {/* Legacy view — customer message + AI response blocks */}
+            {ticket.message && (
+              <div>
+                <p className="text-slate-400 text-sm mb-2">Your message</p>
+                <pre className="whitespace-pre-wrap font-sans bg-slate-800 border border-slate-700 p-4 rounded-lg text-slate-200 text-sm">
+                  {ticket.message}
+                </pre>
+              </div>
+            )}
 
-        {/* AI response */}
-        {ticket.ai_response && (
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Bot className="w-4 h-4 text-[#3B82F6]" />
-              <p className="text-slate-300 text-sm font-medium">AI Response</p>
-            </div>
-            <div className="bg-[#3B82F6]/5 border border-[#3B82F6]/20 rounded-lg p-4">
-              <pre className="whitespace-pre-wrap font-sans text-slate-200 text-sm leading-relaxed">
-                {ticket.ai_response}
-              </pre>
-            </div>
-          </div>
+            {ticket.ai_response && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Bot className="w-4 h-4 text-[#3B82F6]" />
+                  <p className="text-slate-300 text-sm font-medium">AI Response</p>
+                </div>
+                <div className="bg-[#3B82F6]/5 border border-[#3B82F6]/20 rounded-lg p-4">
+                  <pre className="whitespace-pre-wrap font-sans text-slate-200 text-sm leading-relaxed">
+                    {ticket.ai_response}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Escalated notice */}
@@ -214,6 +392,11 @@ export default function TicketStatus({ initialData, ticketId }: TicketStatusProp
               </p>
             </div>
           </div>
+        )}
+
+        {/* Agent reply box — only for admin/agent staff */}
+        {isStaff && (
+          <AgentReplyBox ticketId={ticket.ticket_id} onReplySent={fetchTicket} />
         )}
 
         {/* Resolved — what next */}

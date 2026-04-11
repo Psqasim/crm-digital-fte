@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import type { TicketData } from "@/lib/types";
 import TicketStatus from "./TicketStatus";
+import { auth } from "@/auth";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -39,21 +40,25 @@ export default async function TicketPage({ params }: Props) {
   const { id } = await params;
   const fastapiUrl = process.env.FASTAPI_URL ?? "http://localhost:8000";
 
+  const [sessionResult, fetchResult] = await Promise.allSettled([
+    auth(),
+    fetch(`${fastapiUrl}/support/ticket/${id}`, { cache: "no-store" }),
+  ]);
+
+  const session = sessionResult.status === "fulfilled" ? sessionResult.value : null;
+  const userRole = (session?.user?.role as string | undefined) ?? null;
+
   let ticket: TicketData | null = null;
-  try {
-    const res = await fetch(`${fastapiUrl}/support/ticket/${id}`, {
-      cache: "no-store",
-    });
+  if (fetchResult.status === "fulfilled") {
+    const res = fetchResult.value;
     if (res.status === 404) notFound();
     if (res.ok) ticket = await res.json();
-  } catch {
-    // ticket remains null — TicketStatus handles loading state
   }
 
   return (
     <main className="min-h-screen bg-[#0F172A] text-white py-12 px-4">
       <div className="max-w-2xl mx-auto">
-        <TicketStatus initialData={ticket} ticketId={id} />
+        <TicketStatus initialData={ticket} ticketId={id} userRole={userRole} />
       </div>
     </main>
   );
