@@ -73,3 +73,31 @@ End-to-end wiring, documentation, and knowledge base.
 | ADR-0003 | Pydantic `BaseModel` for all `@function_tool` inputs | OpenAI Agents SDK requires typed schemas; Pydantic v2 generates them automatically |
 | ADR-0004 | pgvector over Pinecone | Keeps vector search co-located with relational data in Neon; avoids a separate vector DB service |
 | ADR-0005 | Confluent Cloud over self-hosted Kafka | Managed Kafka with no infra overhead; free tier sufficient for hackathon scale |
+
+---
+
+## Stage 4: Enhancement (Phases 7A–7B)
+
+Securing internal access and adding a 4th AI support channel.
+
+| Phase | What Was Built | Why |
+|-------|---------------|-----|
+| 7A | NextAuth.js v5 RBAC — login page, admin dashboard, agent account creation, role-based routes | Secure internal access; differentiate admin vs agent vs public views |
+| 7B | AI Chat Widget — floating button, RAG, multilingual, guardrails, session management, mobile-first | 4th support channel for quick Q&A; portfolio impact; real AI interaction on the live site |
+
+### Key decisions in Stage 4
+
+- **JWT strategy (not DB sessions)** — stateless, compatible with HF Spaces ephemeral containers
+- **`proxy.ts` not `middleware.ts`** — Next.js 16.2.2 renamed the middleware entrypoint (ADR-0004)
+- **Non-streaming chat** — `Runner.run()` over `Runner.run_streamed()` — simpler, more reliable on HF Spaces single-process runtime (ADR-0005)
+- **Chat isolated from ticket pipeline** — no Kafka, no DB writes for chat; in-memory sessions only
+- **State lifted to ChatWidget** — session state owned at widget level so minimize/close cycles don't wipe conversation history
+
+### Test growth
+
+| Stage | Tests Passing |
+|-------|--------------|
+| After Stage 1 (incubation) | 101 |
+| After Stage 2 (specialization) | 166 |
+| After Stage 3 (integration/Phase 5) | 166 |
+| After Stage 4 (enhancement/Phase 7B) | 176 |

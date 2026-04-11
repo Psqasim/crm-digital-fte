@@ -111,6 +111,28 @@ Full setup instructions → [docs/setup/setup.md](docs/setup/setup.md)
 
 ---
 
+## Live Demo
+
+| | URL |
+|-|-----|
+| **Frontend** | https://crm-digital-fte-two.vercel.app |
+| **Backend API** | https://psqasim-crm-digital-fte-api.hf.space |
+| **Health check** | https://psqasim-crm-digital-fte-api.hf.space/health |
+
+### Test Credentials
+```
+Admin:  admin@nexaflow.com / Admin123!
+```
+
+### What to try
+1. Submit a support ticket via **Get Support** — watch it auto-resolve in ~30 seconds
+2. Click the **blue bot icon** (bottom-right) to open the AI chat widget
+3. Ask the chat: *"What integrations does NexaFlow support?"*
+4. Ask in Urdu: *"NexaFlow کیا ہے؟"* — response comes back in Urdu
+5. Login as admin to see all tickets, metrics, and staff management
+
+---
+
 ## Project Structure
 
 ```

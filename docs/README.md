@@ -11,4 +11,8 @@
 | `api/` | [api.md](api/api.md) | All 8 FastAPI endpoints with curl examples |
 | `deploy/` | [deployment.md](deploy/deployment.md) | Deploy to Vercel + Hugging Face Spaces |
 | `web-form/` | [README.md](web-form/README.md) | Web form integration guide |
+| `auth/` | [auth.md](auth/auth.md) | Authentication + RBAC guide (NextAuth.js v5) |
+| `chat/` | [chat-agent.md](chat/chat-agent.md) | AI Chat widget guide (RAG, guardrails, API) |
 | — | [project-evolution.md](project-evolution.md) | Phase-by-phase evolution (incubation → production) |
+| — | [runbook.md](runbook.md) | Incident response runbook |
+| — | [deliverables-checklist.md](deliverables-checklist.md) | Hackathon submission checklist |

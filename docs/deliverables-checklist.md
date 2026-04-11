@@ -46,6 +46,18 @@ Verified: 2026-04-08 | Branch: main
 
 ---
 
+## Stage 4: Enhancement Deliverables (Phases 7A–7B)
+
+| Item | Status | Evidence |
+|------|--------|----------|
+| NextAuth.js v5 authentication with RBAC | ✅ | `src/web-form/auth.ts` + `(auth)/login/` — JWT strategy, bcrypt hashing |
+| Admin dashboard with user management | ✅ | `src/web-form/app/(main)/admin/dashboard/` — stats, all tickets, Add Staff Account form |
+| Role-based route protection | ✅ | `src/web-form/proxy.ts` — admin routes blocked for non-admin |
+| AI chat widget (4th channel, RAG, multilingual) | ✅ | `src/web-form/components/chat/` + `production/chat/` — OpenAI Agents SDK, pgvector RAG |
+| Chat guardrails + injection protection | ✅ | `production/chat/sanitizer.py` — 9 injection patterns, 422 on detection |
+| Ticket ownership (My Tickets) | ✅ | `GET /support/tickets?email=` — users see only their own tickets |
+| Auto-fill email on support form for logged-in users | ✅ | `support/page.tsx` passes session email; field is read-only when logged in |
+
 ## Bonus / Additional
 
 | Item | Status | Evidence |
@@ -55,6 +67,7 @@ Verified: 2026-04-08 | Branch: main
 | Project evolution documentation | ✅ | `docs/project-evolution.md` — phase-by-phase with test growth table |
 | Knowledge base seeded (pgvector) | ✅ | 11 chunks from `context/product-docs.md` via `text-embedding-3-small` |
 | Security audit | ✅ | No secrets in tracked files; `.env` in `.gitignore` |
+| Live demo deployed | ✅ | Frontend: Vercel · Backend: HF Spaces (psqasim-crm-digital-fte-api.hf.space) |
 
 ---
 
@@ -81,7 +94,8 @@ Verified: 2026-04-08 | Branch: main
 
 ## Summary
 
-- ✅ Complete: **13 / 14** deliverable items
+- ✅ Complete: **20 / 21** deliverable items
 - ⚠️ Partial: **1** (load test — infrastructure not deployed)
-- Tests: **166 passing**, 5 E2E tests (CI-safe)
+- Tests: **176 passing**, 5 E2E tests (CI-safe)
 - GitHub: https://github.com/Psqasim/crm-digital-fte
+- Live: https://psqasim-crm-digital-fte-api.hf.space/health
