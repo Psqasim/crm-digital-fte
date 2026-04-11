@@ -25,6 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from production.api.agent_routes import router as agent_router
+from production.api.chat_routes import router as chat_router
 from production.api.web_form_routes import router as web_form_router
 from production.api.webhooks import router as webhooks_router
 from production.channels.kafka_producer import stop_kafka_producer
@@ -140,6 +141,7 @@ async def log_requests(request: Request, call_next):
 app.include_router(webhooks_router)          # /webhooks/gmail, /webhooks/whatsapp
 app.include_router(web_form_router)          # /support/submit, /support/ticket/{id}, /metrics/summary
 app.include_router(agent_router)             # /agent/process/{id}, /agent/process-pending
+app.include_router(chat_router)              # /chat/message
 
 
 # ---------------------------------------------------------------------------

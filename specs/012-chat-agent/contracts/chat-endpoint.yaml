@@ -1,0 +1,217 @@
+openapi: "3.1.0"
+info:
+  title: NexaFlow Chat Endpoint
+  description: |
+    POST /chat/message — Stateless AI chat for the NexaFlow support widget.
+
+    This endpoint is isolated from the ticket pipeline (no Kafka, no ticket creation).
+    Sessions are tracked in-memory. Rate limit: 20 messages per session_id.
+  version: "1.0.0"
+
+servers:
+  - url: https://psqasim-crm-digital-fte-api.hf.space
+    description: Hugging Face Spaces (production)
+  - url: http://localhost:8000
+    description: Local development
+
+paths:
+  /chat/message:
+    post:
+      operationId: sendChatMessage
+      summary: Send a message to the NexaFlow AI support chat
+      description: |
+        Accepts a user message with conversation history. Performs:
+        1. Input sanitization (HTML strip, length check)
+        2. Prompt injection pattern detection
+        3. Session rate limit check (20 messages per session_id)
+        4. Knowledge base RAG search
+        5. OpenAI Agents SDK Runner.run() with accumulated input_items
+        6. Returns AI reply + session_id
+
+        The caller is responsible for maintaining display history and
+        passing the last 10 messages in each request.
+
+        On clear-chat: send session_id="" to start a new session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatMessageRequest"
+            examples:
+              first_message:
+                summary: First message (no session yet)
+                value:
+                  message: "How do I connect NexaFlow to Slack?"
+                  session_id: ""
+                  history: []
+              subsequent_message:
+                summary: Follow-up message with history
+                value:
+                  message: "What permissions does the Slack integration need?"
+                  session_id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+                  history:
+                    - role: "user"
+                      content: "How do I connect NexaFlow to Slack?"
+                    - role: "assistant"
+                      content: "Hi! To connect NexaFlow to Slack, go to Settings > Integrations > Slack and click 'Connect'. You'll need to authorize the NexaFlow app in your Slack workspace. Is there anything else I can help you with?"
+              urdu_message:
+                summary: Urdu-language message (multilingual)
+                value:
+                  message: "میں NexaFlow کو Slack سے کیسے جوڑوں؟"
+                  session_id: ""
+                  history: []
+      responses:
+        "200":
+          description: AI response generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageResponse"
+              examples:
+                success:
+                  summary: Successful AI reply
+                  value:
+                    reply: "Hi! To connect NexaFlow to Slack, navigate to Settings > Integrations > Slack and click 'Connect'. You'll need admin permissions in your Slack workspace. Is there anything else I can help you with?"
+                    session_id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+                with_warning:
+                  summary: Reply with rate limit warning (message 18)
+                  value:
+                    reply: "Great question! Here's how password reset works..."
+                    session_id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+                    warning: "You have 2 messages remaining in this session."
+        "400":
+          description: |
+            Invalid request — message is empty, exceeds 500 characters,
+            or contains HTML injection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                too_long:
+                  value:
+                    detail: "Message too long (max 500 characters)"
+                empty:
+                  value:
+                    detail: "Message cannot be empty"
+        "422":
+          description: |
+            Prompt injection detected — message contains patterns that
+            attempt to override agent instructions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                injection:
+                  value:
+                    detail: "I can't process that request. Please keep questions about NexaFlow support."
+        "429":
+          description: |
+            Session rate limit reached — 20 messages sent in this session.
+            Frontend must disable the input and show the support form link.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                limit_reached:
+                  value:
+                    detail: "Session limit reached. Please submit a formal support ticket for continued assistance."
+        "500":
+          description: |
+            AI backend error (OpenAI API failure, database unreachable).
+            Always returns a user-friendly message, never a stack trace.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                ai_error:
+                  value:
+                    detail: "I'm having trouble connecting. Please try again or use our support form."
+
+components:
+  schemas:
+    ChatMessageRequest:
+      type: object
+      required:
+        - message
+        - session_id
+        - history
+      properties:
+        message:
+          type: string
+          description: |
+            The user's message text. Must be 1–500 characters after sanitization.
+            HTML tags are stripped. Prompt injection patterns are rejected.
+          minLength: 1
+          maxLength: 500
+          example: "How do I reset my password?"
+        session_id:
+          type: string
+          description: |
+            UUID v4 identifying the current session.
+            Send "" (empty string) to start a new session.
+            The server generates a new UUID on first message and returns it.
+          example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+        history:
+          type: array
+          description: |
+            Last 10 messages of the conversation (for AI context).
+            Older messages are not needed — the server trims to a 10-turn window.
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/HistoryMessage"
+
+    HistoryMessage:
+      type: object
+      required:
+        - role
+        - content
+      properties:
+        role:
+          type: string
+          enum: ["user", "assistant"]
+          description: Message sender role
+        content:
+          type: string
+          description: Message text content
+          example: "How do I connect NexaFlow to Slack?"
+
+    ChatMessageResponse:
+      type: object
+      required:
+        - reply
+        - session_id
+      properties:
+        reply:
+          type: string
+          description: AI-generated support response in the detected user language
+          example: "Hi! To connect NexaFlow to Slack, go to Settings > Integrations > Slack..."
+        session_id:
+          type: string
+          description: |
+            UUID v4 for this session. Use this value in all subsequent requests.
+            Same as the request session_id unless the request had session_id=""
+            (first message), in which case a new UUID is returned.
+          example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+        warning:
+          type: string
+          nullable: true
+          description: |
+            Present when the session is approaching the 20-message limit.
+            "You have 2 messages remaining in this session." (at message 18)
+            "You have 1 message remaining in this session." (at message 19)
+          example: "You have 2 messages remaining in this session."
+
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          description: User-friendly error message (never a stack trace)
+          example: "I'm having trouble connecting. Please try again or use our support form."
