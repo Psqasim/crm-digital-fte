@@ -77,10 +77,9 @@ export default function ChatPanel({ onClose, onMinimize }: ChatPanelProps) {
     if (!isLoading && !isLimitReached) sendMessage(text);
   };
 
-  // isOnlyGreeting: only the auto-greeting exists, user hasn't typed yet
-  const isOnlyGreeting = messages.length === 1 && messages[0].role === "assistant";
+  const isEmpty = messages.length === 0 && !isLoading;
   const canSend = input.trim().length > 0 && !isLoading && !isLimitReached;
-  const hasConversation = messages.length > 1;
+  const hasConversation = messages.length > 0;
 
   return (
     <div className="flex flex-col h-full bg-[#0F172A]">
@@ -135,8 +134,8 @@ export default function ChatPanel({ onClose, onMinimize }: ChatPanelProps) {
         ref={scrollRef}
         className="flex-1 overflow-y-auto px-4 py-4"
       >
-        {/* Empty state — shown INSTEAD of the greeting bubble */}
-        {isOnlyGreeting && !isLoading && (
+        {/* Empty state — shown when no messages yet */}
+        {isEmpty && (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-center pb-4">
             <div className="w-16 h-16 rounded-2xl bg-blue-600/15 border border-blue-500/25 flex items-center justify-center">
               <Bot className="w-8 h-8 text-blue-400" />
@@ -162,7 +161,7 @@ export default function ChatPanel({ onClose, onMinimize }: ChatPanelProps) {
           </div>
         )}
 
-        {/* Conversation — only render message bubbles once user has started chatting */}
+        {/* Conversation — render bubbles once user has sent first message */}
         {hasConversation && (
           <>
             {messages.map((msg) => (
@@ -172,8 +171,8 @@ export default function ChatPanel({ onClose, onMinimize }: ChatPanelProps) {
           </>
         )}
 
-        {/* Loading state on first message (no prior messages to show) */}
-        {isOnlyGreeting && isLoading && <TypingIndicator />}
+        {/* Loading state before first reply */}
+        {messages.length === 0 && isLoading && <TypingIndicator />}
       </div>
 
       {/* ------------------------------------------------------------------ */}

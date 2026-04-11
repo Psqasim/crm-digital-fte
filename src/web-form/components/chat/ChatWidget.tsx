@@ -174,9 +174,10 @@ export function ChatWidget() {
                   isMinimized ? "h-[52px]" : "h-[520px]"
                 }`}
               >
-                {isMinimized ? (
+                {/* Minimized bar — click to expand */}
+                {isMinimized && (
                   <div
-                    className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-slate-800 to-slate-900 cursor-pointer"
+                    className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-slate-800 to-slate-900 cursor-pointer flex-shrink-0"
                     onClick={handleMinimize}
                   >
                     <div className="flex items-center gap-2">
@@ -185,9 +186,14 @@ export function ChatWidget() {
                     </div>
                     <span className="text-slate-400 text-xs">Click to expand</span>
                   </div>
-                ) : (
-                  <ChatPanel onClose={handleClose} onMinimize={handleMinimize} />
                 )}
+                {/* ChatPanel — always mounted so state survives minimize */}
+                <div
+                  className="flex flex-col flex-1 min-h-0"
+                  style={{ display: isMinimized ? "none" : undefined }}
+                >
+                  <ChatPanel onClose={handleClose} onMinimize={handleMinimize} />
+                </div>
               </motion.div>
             )}
           </>

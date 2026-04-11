@@ -31,25 +31,12 @@ interface ChatSessionState {
 }
 
 // ---------------------------------------------------------------------------
-// Greeting constant
-// ---------------------------------------------------------------------------
-
-function makeGreeting(): ChatMessage {
-  return {
-    id: crypto.randomUUID(),
-    role: "assistant",
-    content: "Hi! I'm NexaFlow's AI assistant. How can I help you today?",
-    timestamp: new Date(),
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
 
 export function useChatSession() {
   const [sessionId, setSessionId] = useState<string>("");
-  const [messages, setMessages] = useState<ChatMessage[]>([makeGreeting()]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [messageCount, setMessageCount] = useState(0);
   const [warning, setWarning] = useState<string | null>(null);
@@ -144,7 +131,7 @@ export function useChatSession() {
   // -------------------------------------------------------------------------
 
   const clearChat = useCallback(() => {
-    setMessages([makeGreeting()]);
+    setMessages([]);
     setSessionId(""); // "" signals fresh session to backend
     setMessageCount(0);
     setWarning(null);
