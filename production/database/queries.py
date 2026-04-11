@@ -525,7 +525,7 @@ async def get_tickets_by_email(
         async with pool.acquire() as conn:
             rows = await conn.fetch(
                 "SELECT t.id, t.status, t.category, t.priority, t.subject, "
-                "       t.created_at, t.updated_at "
+                "       t.channel, t.created_at, t.updated_at "
                 "FROM tickets t "
                 "JOIN customers c ON c.id = t.customer_id "
                 "WHERE c.email = $1 "
@@ -540,6 +540,7 @@ async def get_tickets_by_email(
                     "category": r["category"],
                     "priority": r["priority"],
                     "subject": r["subject"],
+                    "channel": r["channel"],
                     "created_at": r["created_at"].isoformat() if hasattr(r["created_at"], "isoformat") else r["created_at"],
                     "updated_at": r["updated_at"].isoformat() if r["updated_at"] and hasattr(r["updated_at"], "isoformat") else r["updated_at"],
                 }
