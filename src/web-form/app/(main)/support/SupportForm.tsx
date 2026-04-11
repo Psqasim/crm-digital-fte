@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -128,7 +128,12 @@ function TicketSuccessCard({ ticketId, onReset }: { ticketId: string; onReset: (
   );
 }
 
-export default function SupportForm() {
+interface SupportFormProps {
+  defaultEmail: string | null;
+  defaultName: string | null;
+}
+
+export default function SupportForm({ defaultEmail, defaultName }: SupportFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [submittedTicketId, setSubmittedTicketId] = useState<string | null>(null);
   const confettiFired = useRef(false);
@@ -136,14 +141,20 @@ export default function SupportForm() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: "",
-      email: "",
+      name: defaultName ?? "",
+      email: defaultEmail ?? "",
       subject: "",
       category: undefined,
       priority: undefined,
       message: "",
     },
   });
+
+  // Keep values in sync if server-side props arrive after hydration
+  useEffect(() => {
+    if (defaultEmail) form.setValue("email", defaultEmail, { shouldValidate: false });
+    if (defaultName) form.setValue("name", defaultName, { shouldValidate: false });
+  }, [defaultEmail, defaultName, form]);
 
   const messageLength = form.watch("message").length;
 
@@ -230,11 +241,24 @@ export default function SupportForm() {
                       <Input
                         type="email"
                         placeholder="jane@example.com"
-                        className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 focus-visible:ring-[#3B82F6]"
+                        readOnly={!!defaultEmail}
+                        className={`bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 focus-visible:ring-[#3B82F6] ${
+                          defaultEmail ? "opacity-70 cursor-not-allowed select-none" : ""
+                        }`}
                         {...field}
                       />
                     </FormControl>
-                    <FormMessage />
+                    {defaultEmail ? (
+                      <p className="text-xs text-slate-500 mt-1">
+                        Submitting as <span className="text-blue-400">{defaultEmail}</span>
+                        {" · "}
+                        <a href="/api/auth/signout" className="hover:text-slate-300 underline underline-offset-2">
+                          Sign out
+                        </a>
+                      </p>
+                    ) : (
+                      <FormMessage />
+                    )}
                   </FormItem>
                 )}
               />

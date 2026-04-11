@@ -24,7 +24,7 @@ export default async function DashboardPage() {
             </span>
           </p>
         </div>
-        <MyTicketsContent email={session.user.email ?? ""} />
+        <MyTicketsContent email={session.user.email ?? ""} role={session.user.role} />
       </div>
     </main>
   );

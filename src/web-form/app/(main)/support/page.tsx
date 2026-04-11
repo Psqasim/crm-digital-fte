@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { auth } from "@/auth";
 import SupportForm from "./SupportForm";
 
 export const metadata: Metadata = {
@@ -13,7 +14,9 @@ export const metadata: Metadata = {
   },
 };
 
-export default function SupportPage() {
+export default async function SupportPage() {
+  const session = await auth();
+
   return (
     <main className="min-h-screen bg-[#0F172A] text-white py-12 px-4">
       <div className="max-w-2xl mx-auto">
@@ -23,7 +26,10 @@ export default function SupportPage() {
             Fill out the form below and our AI will respond within hours.
           </p>
         </div>
-        <SupportForm />
+        <SupportForm
+          defaultEmail={session?.user?.email ?? null}
+          defaultName={session?.user?.name ?? null}
+        />
       </div>
     </main>
   );

@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Ticket, RefreshCw } from "lucide-react";
+import { Ticket, RefreshCw, ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead,
@@ -46,7 +46,7 @@ function relativeTime(iso: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-export default function MyTicketsContent({ email }: { email: string }) {
+export default function MyTicketsContent({ email, role }: { email: string; role: string }) {
   const [tickets, setTickets] = useState<MyTicket[] | null>(null);
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -73,9 +73,20 @@ export default function MyTicketsContent({ email }: { email: string }) {
 
   return (
     <div className="space-y-4">
+      {/* Admin shortcut banner */}
+      {role === "admin" && (
+        <Link
+          href="/admin/dashboard"
+          className="flex items-center justify-between px-4 py-3 bg-blue-600/10 border border-blue-600/30 rounded-xl text-sm text-blue-300 hover:bg-blue-600/20 hover:text-blue-200 transition-colors"
+        >
+          <span>You&apos;re an admin — view all system tickets in Admin Dashboard</span>
+          <ArrowRight className="w-4 h-4 flex-shrink-0 ml-2" />
+        </Link>
+      )}
+
       <div className="flex items-center justify-between">
         <p className="text-slate-400 text-sm">
-          Tickets submitted from your account ({email})
+          Showing tickets submitted from <span className="text-slate-300">{email}</span>
         </p>
         <button
           onClick={handleRefresh}
