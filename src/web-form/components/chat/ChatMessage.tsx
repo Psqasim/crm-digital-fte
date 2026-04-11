@@ -140,7 +140,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
   return (
     <div className={`flex flex-col mb-3 ${isUser ? "items-end" : "items-start"}`}>
       <div
-        className={`max-w-[85%] px-4 py-2.5 text-sm break-words overflow-hidden ${
+        className={`max-w-[85%] px-4 py-2.5 text-sm break-words ${
           isUser
             ? "bg-blue-600 text-white rounded-2xl rounded-br-sm"
             : "bg-slate-700 text-slate-100 rounded-2xl rounded-bl-sm"
