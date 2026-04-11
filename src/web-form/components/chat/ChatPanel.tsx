@@ -2,21 +2,27 @@
 
 /**
  * components/chat/ChatPanel.tsx
- * Phase 7B (updated): Chat panel — cleaner UI, no duplicate greeting.
+ * Phase 7B: Pure display component — no state of its own.
  *
- * Empty state: shows Bot icon + subtitle + suggestion chips (no bubble).
- * Once user sends first message, chat bubbles appear normally.
- * "New Chat" button replaces the Trash + confirm flow.
+ * All state (messages, session, loading) is owned by ChatWidget and
+ * passed in as props. This way minimize / close / reopen cycles don't
+ * wipe the conversation.
  */
 
 import { useEffect, useRef, useState, KeyboardEvent } from "react";
 import { ChevronDown, X, Send, Bot, Plus, RotateCcw } from "lucide-react";
 import ChatMessage from "./ChatMessage";
-import { useChatSession } from "@/hooks/useChatSession";
+import type { ChatMessage as ChatMessageType } from "@/hooks/useChatSession";
 
 interface ChatPanelProps {
   onClose: () => void;
   onMinimize: () => void;
+  messages: ChatMessageType[];
+  isLoading: boolean;
+  warning: string | null;
+  isLimitReached: boolean;
+  onSend: (text: string) => void;
+  onClear: () => void;
 }
 
 const SUGGESTIONS = [
@@ -46,10 +52,11 @@ function TypingIndicator() {
   );
 }
 
-export default function ChatPanel({ onClose, onMinimize }: ChatPanelProps) {
-  const { messages, isLoading, warning, isLimitReached, sendMessage, clearChat } =
-    useChatSession();
-
+export default function ChatPanel({
+  onClose, onMinimize,
+  messages, isLoading, warning, isLimitReached,
+  onSend, onClear,
+}: ChatPanelProps) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -63,7 +70,7 @@ export default function ChatPanel({ onClose, onMinimize }: ChatPanelProps) {
     const text = input.trim();
     if (!text || isLoading || isLimitReached) return;
     setInput("");
-    sendMessage(text);
+    onSend(text);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -74,19 +81,17 @@ export default function ChatPanel({ onClose, onMinimize }: ChatPanelProps) {
   };
 
   const handleSuggestion = (text: string) => {
-    if (!isLoading && !isLimitReached) sendMessage(text);
+    if (!isLoading && !isLimitReached) onSend(text);
   };
 
   const isEmpty = messages.length === 0 && !isLoading;
-  const canSend = input.trim().length > 0 && !isLoading && !isLimitReached;
   const hasConversation = messages.length > 0;
+  const canSend = input.trim().length > 0 && !isLoading && !isLimitReached;
 
   return (
     <div className="flex flex-col h-full bg-[#0F172A]">
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Header                                                               */}
-      {/* ------------------------------------------------------------------ */}
+      {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/60 flex-shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
@@ -102,16 +107,19 @@ export default function ChatPanel({ onClose, onMinimize }: ChatPanelProps) {
         </div>
 
         <div className="flex items-center gap-0.5">
-          {/* New Chat — only show when there's a conversation */}
-          {hasConversation && (
-            <button
-              onClick={clearChat}
-              title="New conversation"
-              className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
-          )}
+          {/* New conversation button — always visible */}
+          <button
+            onClick={onClear}
+            title="New conversation"
+            disabled={!hasConversation}
+            className={`p-1.5 rounded-lg transition-colors ${
+              hasConversation
+                ? "text-slate-400 hover:text-blue-400 hover:bg-blue-500/10"
+                : "text-slate-700 cursor-default"
+            }`}
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
           <button
             onClick={onMinimize}
             className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700/60 rounded-lg transition-colors"
@@ -127,14 +135,10 @@ export default function ChatPanel({ onClose, onMinimize }: ChatPanelProps) {
         </div>
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Content area                                                          */}
-      {/* ------------------------------------------------------------------ */}
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 py-4"
-      >
-        {/* Empty state — shown when no messages yet */}
+      {/* ── Messages area ────────────────────────────────────────────────── */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
+
+        {/* Empty state */}
         {isEmpty && (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-center pb-4">
             <div className="w-16 h-16 rounded-2xl bg-blue-600/15 border border-blue-500/25 flex items-center justify-center">
@@ -161,7 +165,7 @@ export default function ChatPanel({ onClose, onMinimize }: ChatPanelProps) {
           </div>
         )}
 
-        {/* Conversation — render bubbles once user has sent first message */}
+        {/* Conversation bubbles */}
         {hasConversation && (
           <>
             {messages.map((msg) => (
@@ -171,28 +175,24 @@ export default function ChatPanel({ onClose, onMinimize }: ChatPanelProps) {
           </>
         )}
 
-        {/* Loading state before first reply */}
+        {/* Loading before first reply */}
         {messages.length === 0 && isLoading && <TypingIndicator />}
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Rate limit warning                                                   */}
-      {/* ------------------------------------------------------------------ */}
+      {/* ── Rate limit warning ────────────────────────────────────────────── */}
       {warning && !isLimitReached && (
         <div className="mx-4 mb-2 px-3 py-2 bg-amber-900/20 border border-amber-600/30 rounded-lg text-amber-300 text-xs flex-shrink-0">
           ⚠️ {warning}
         </div>
       )}
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Input area                                                            */}
-      {/* ------------------------------------------------------------------ */}
+      {/* ── Input area ───────────────────────────────────────────────────── */}
       {isLimitReached ? (
         <div className="px-4 py-4 border-t border-slate-700/60 text-center flex-shrink-0">
           <p className="text-slate-400 text-sm mb-3">Session limit reached.</p>
           <div className="flex gap-2 justify-center">
             <button
-              onClick={clearChat}
+              onClick={onClear}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors flex items-center gap-1.5"
             >
               <RotateCcw className="w-3.5 h-3.5" />
