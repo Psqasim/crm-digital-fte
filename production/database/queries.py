@@ -373,17 +373,28 @@ async def get_ticket_by_display_id(
             display_id = "TKT-" + internal_id[:8].upper()
             conv_id = str(row["conversation_id"]) if row["conversation_id"] else None
 
-            # Fetch latest AI reply for this conversation
+            # Fetch all messages for this conversation (customer, AI, human agent)
             ai_response: str | None = None
+            messages: list[dict[str, Any]] = []
             if conv_id:
-                ai_row = await conn.fetchrow(
-                    "SELECT content FROM messages "
-                    "WHERE conversation_id = $1 AND role = 'assistant' "
-                    "ORDER BY created_at DESC LIMIT 1",
+                msg_rows = await conn.fetch(
+                    "SELECT role, content, created_at FROM messages "
+                    "WHERE conversation_id = $1 "
+                    "ORDER BY created_at ASC",
                     row["conversation_id"],
                 )
-                if ai_row:
-                    ai_response = ai_row["content"]
+                for m in msg_rows:
+                    messages.append({
+                        "role": m["role"],
+                        "content": m["content"],
+                        "created_at": m["created_at"].isoformat() if hasattr(m["created_at"], "isoformat") else str(m["created_at"]),
+                        "is_human_agent": m["role"] == "agent",
+                    })
+                # Latest assistant message kept for backward compat
+                for m in reversed(messages):
+                    if m["role"] == "assistant":
+                        ai_response = m["content"]
+                        break
 
             return {
                 "ticket_id": display_id,
@@ -396,6 +407,7 @@ async def get_ticket_by_display_id(
                 "subject": row["subject"],
                 "message": row["body"],
                 "ai_response": ai_response,
+                "messages": messages,
                 "customer_name": row["customer_name"],
                 "customer_email": row["customer_email"],
                 "created_at": row["created_at"],

@@ -13,6 +13,7 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from production.agent.customer_success_agent import AgentResponse, CustomerContext, process_ticket
 from production.database import queries
@@ -151,6 +152,78 @@ async def process_pending_tickets(background_tasks: BackgroundTasks) -> JSONResp
         )
     except Exception:
         logger.exception("[agent] process_pending_tickets failed")
+        return JSONResponse({"detail": "Internal server error"}, status_code=500)
+
+
+# ---------------------------------------------------------------------------
+# POST /agent/reply — human agent sends a reply to an escalated ticket
+# ---------------------------------------------------------------------------
+
+
+class AgentReplyBody(BaseModel):
+    ticket_id: str
+    message: str
+    agent_email: str
+
+
+@router.post("/reply")
+async def agent_reply(body: AgentReplyBody) -> JSONResponse:
+    """Allow a human agent to reply to a ticket.
+
+    Adds a message with role='agent' to the ticket's conversation.
+    Changes ticket status from 'escalated' → 'in_progress'.
+
+    Returns:
+        200 with {success: true, message_id: str}
+        400 if message is empty
+        404 if ticket not found
+        500 on DB error
+    """
+    if not body.message.strip():
+        return JSONResponse({"detail": "Message cannot be empty"}, status_code=400)
+
+    try:
+        pool = await get_db_pool()
+        ticket = await queries.get_ticket_by_display_id(pool, body.ticket_id)
+        if ticket is None:
+            return JSONResponse(
+                {"detail": f"Ticket {body.ticket_id} not found"}, status_code=404
+            )
+
+        conversation_id = ticket.get("conversation_id")
+        internal_id = ticket.get("internal_id")
+
+        if not conversation_id:
+            return JSONResponse(
+                {"detail": "Ticket has no conversation"}, status_code=400
+            )
+
+        # Add human agent reply as role='agent'
+        message_id = await queries.add_message(
+            pool,
+            conversation_id,
+            role="agent",
+            content=body.message.strip(),
+            channel="web_form",
+        )
+
+        # Move ticket from escalated → in_progress (being handled)
+        if internal_id and ticket.get("status") == "escalated":
+            await queries.update_ticket_status(pool, internal_id, "in_progress")
+
+        logger.info(
+            "[agent_reply] %s replied to ticket %s (msg_id=%s)",
+            body.agent_email,
+            body.ticket_id,
+            message_id,
+        )
+        return JSONResponse(
+            {"success": True, "message_id": message_id or ""},
+            status_code=200,
+        )
+
+    except Exception:
+        logger.exception("[agent_reply] failed for ticket %s", body.ticket_id)
         return JSONResponse({"detail": "Internal server error"}, status_code=500)
 
 

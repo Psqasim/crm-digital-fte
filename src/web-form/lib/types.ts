@@ -1,5 +1,12 @@
 export type TicketStatus = "open" | "in_progress" | "resolved" | "escalated";
 
+export interface TicketMessage {
+  role: "customer" | "assistant" | "agent";
+  content: string;
+  created_at: string;
+  is_human_agent: boolean;
+}
+
 export interface TicketData {
   ticket_id: string;
   internal_id: string;
@@ -9,6 +16,7 @@ export interface TicketData {
   subject: string | null;
   message: string | null;
   ai_response: string | null;
+  messages?: TicketMessage[];
   customer_name: string;
   customer_email: string;
   created_at: string;
