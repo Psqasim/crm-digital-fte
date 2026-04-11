@@ -141,7 +141,7 @@ function AgentReplyBox({
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        setError(json.error ?? "Failed to send reply");
+        setError(json.error ?? json.detail ?? `Server error (${res.status})`);
         return;
       }
       setText("");
