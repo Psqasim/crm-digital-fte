@@ -610,33 +610,54 @@ async def update_ticket_status(
     status: str,
     reason: str | None = None,
 ) -> None:
-    """Update ticket status and optionally set escalation_reason or resolution_summary."""
+    """Update ticket status and optionally set escalation_reason or resolution_summary.
+
+    ticket_id may be either an internal UUID string or a display ID (TKT-XXXXXXXX).
+    Display IDs are resolved to the internal UUID before updating.
+    """
     try:
         async with pool.acquire() as conn:
+            # Resolve display ID → internal UUID if needed
+            internal_id = ticket_id
+            if ticket_id.startswith("TKT-"):
+                suffix = ticket_id[4:].upper()
+                row = await conn.fetchrow(
+                    "SELECT id::text FROM tickets "
+                    "WHERE upper(substring(id::text, 1, 8)) = $1 LIMIT 1",
+                    suffix,
+                )
+                if not row:
+                    logger.warning(
+                        "update_ticket_status: display ID %s not found", ticket_id
+                    )
+                    return
+                internal_id = row[0]
+
             if status == "resolved":
                 await conn.execute(
                     "UPDATE tickets "
                     "SET status = $1, resolution_summary = $2, "
                     "    resolved_at = NOW(), updated_at = NOW() "
-                    "WHERE id = $3",
+                    "WHERE id = $3::uuid",
                     status,
                     reason,
-                    ticket_id,
+                    internal_id,
                 )
             elif status == "escalated":
                 await conn.execute(
                     "UPDATE tickets "
                     "SET status = $1, escalation_reason = $2, updated_at = NOW() "
-                    "WHERE id = $3",
+                    "WHERE id = $3::uuid",
                     status,
                     reason,
-                    ticket_id,
+                    internal_id,
                 )
             else:
                 await conn.execute(
-                    "UPDATE tickets SET status = $1, updated_at = NOW() WHERE id = $2",
+                    "UPDATE tickets SET status = $1, updated_at = NOW() "
+                    "WHERE id = $2::uuid",
                     status,
-                    ticket_id,
+                    internal_id,
                 )
     except Exception:
         logger.exception(
