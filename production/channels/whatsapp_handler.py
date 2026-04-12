@@ -195,7 +195,7 @@ class WhatsAppHandler:
             if self.twilio_client is None:
                 raise RuntimeError("Twilio client not initialised — check TWILIO credentials")
 
-            from_number = os.environ.get("TWILIO_WHATSAPP_NUMBER", "")
+            from_number = os.environ.get("TWILIO_WHATSAPP_NUMBER", "").strip()
             message = self.twilio_client.messages.create(
                 to=f"whatsapp:{to_phone}",
                 from_=from_number,
