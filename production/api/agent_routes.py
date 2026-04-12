@@ -9,6 +9,7 @@ POST /agent/process-pending      — enqueue all open/pending tickets for proces
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import asdict
 
 from fastapi import APIRouter, BackgroundTasks
@@ -22,6 +23,42 @@ from production.database.queries import get_db_pool
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/agent")
+
+
+# ---------------------------------------------------------------------------
+# Escalation notification helper
+# ---------------------------------------------------------------------------
+
+
+async def _notify_escalation(
+    ticket_id: str,
+    customer_name: str,
+    subject: str,
+    channel: str,
+) -> None:
+    """Send a WhatsApp alert to the admin when a ticket is escalated.
+
+    Reads ADMIN_WHATSAPP_NUMBER from env (e.g. whatsapp:+923460326429).
+    No-op if the env var is not set.
+    """
+    admin_phone = os.environ.get("ADMIN_WHATSAPP_NUMBER", "").strip()
+    if not admin_phone:
+        return
+    try:
+        from production.channels.whatsapp_handler import _get_handler as _get_wa_handler  # noqa: PLC0415
+        handler = _get_wa_handler()
+        message = (
+            f"🚨 Escalated Ticket Alert\n"
+            f"Ticket: {ticket_id}\n"
+            f"Customer: {customer_name}\n"
+            f"Subject: {subject or 'N/A'}\n"
+            f"Channel: {channel}\n"
+            f"Reply at: https://crm-digital-fte-two.vercel.app/ticket/{ticket_id}"
+        )
+        await handler.send_reply(admin_phone, message)
+        logger.info("[escalation_notify] admin notified for ticket %s", ticket_id)
+    except Exception:
+        logger.exception("[escalation_notify] failed for ticket %s", ticket_id)
 
 
 # ---------------------------------------------------------------------------
@@ -82,6 +119,15 @@ async def _run_agent_on_ticket(pool, ticket: dict) -> AgentResponse:
             else agent_resp.response_text[:200]
         )
         await queries.update_ticket_status(pool, internal_id, new_status, reason)
+
+        # Notify admin on WhatsApp when ticket is escalated
+        if agent_resp.escalated:
+            await _notify_escalation(
+                ticket_id=display_ticket_id,
+                customer_name=ticket.get("customer_name") or "Customer",
+                subject=ticket.get("subject") or raw_message[:80],
+                channel=ctx.channel,
+            )
 
     # Persist agent response as a message
     conversation_id = ticket.get("conversation_id")
@@ -210,6 +256,28 @@ async def agent_reply(body: AgentReplyBody) -> JSONResponse:
         # Move ticket from escalated → in_progress (being handled)
         if internal_id and ticket.get("status") == "escalated":
             await queries.update_ticket_status(pool, internal_id, "in_progress")
+
+        # Send reply back via original channel
+        ticket_channel = ticket.get("channel", "")
+        if ticket_channel == "whatsapp":
+            # customer_name is the phone number for WhatsApp tickets
+            customer_phone = (ticket.get("customer_name") or "").strip()
+            if customer_phone.startswith("+"):
+                try:
+                    from production.channels.whatsapp_handler import _get_handler as _get_wa_handler  # noqa: PLC0415
+                    wa_handler = _get_wa_handler()
+                    await wa_handler.send_reply(customer_phone, body.message.strip())
+                    logger.info(
+                        "[agent_reply] WhatsApp reply sent to %s for ticket %s",
+                        customer_phone,
+                        body.ticket_id,
+                    )
+                except Exception:
+                    logger.exception(
+                        "[agent_reply] failed to send WhatsApp reply for ticket %s",
+                        body.ticket_id,
+                    )
+                    # Message already saved to DB — don't fail the request
 
         logger.info(
             "[agent_reply] %s replied to ticket %s (msg_id=%s)",
