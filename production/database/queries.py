@@ -334,7 +334,7 @@ async def get_ticket_by_display_id(
                 suffix = ticket_id[4:].upper()
                 row = await conn.fetchrow(
                     "SELECT t.id, t.conversation_id, t.customer_id, "
-                    "       t.status, t.category, t.priority, t.subject, "
+                    "       t.status, t.category, t.priority, t.subject, t.channel, "
                     "       t.created_at, t.updated_at, t.resolved_at, "
                     "       c.name AS customer_name, c.email AS customer_email, "
                     "       cust_msg.content AS body "
@@ -352,7 +352,7 @@ async def get_ticket_by_display_id(
             else:
                 row = await conn.fetchrow(
                     "SELECT t.id, t.conversation_id, t.customer_id, "
-                    "       t.status, t.category, t.priority, t.subject, "
+                    "       t.status, t.category, t.priority, t.subject, t.channel, "
                     "       t.created_at, t.updated_at, t.resolved_at, "
                     "       c.name AS customer_name, c.email AS customer_email, "
                     "       cust_msg.content AS body "
@@ -405,6 +405,7 @@ async def get_ticket_by_display_id(
                 "category": row["category"],
                 "priority": row["priority"],
                 "subject": row["subject"],
+                "channel": row["channel"],
                 "message": row["body"],
                 "ai_response": ai_response,
                 "messages": messages,
