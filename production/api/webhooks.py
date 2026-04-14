@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import sys
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, BackgroundTasks, Request
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
@@ -73,7 +73,7 @@ async def gmail_webhook(request: Request) -> JSONResponse:
 
 
 @router.post("/webhooks/whatsapp")
-async def whatsapp_webhook(request: Request) -> JSONResponse:
+async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks) -> JSONResponse:
     """Receive a Twilio WhatsApp webhook and enqueue a TicketMessage.
 
     Returns HTTP 403 for missing/invalid Twilio signature.
@@ -100,12 +100,9 @@ async def whatsapp_webhook(request: Request) -> JSONResponse:
         if not wa_handler.validate_signature(url, post_params, signature):
             return JSONResponse({"error": "invalid_signature"}, status_code=403)
 
-        # Process webhook — Kafka failures must not break response
-        try:
-            await wa_handler.process_webhook(post_params)
-        except Exception as inner_e:
-            print(f"[webhooks/whatsapp] process error: {type(inner_e).__name__}: {inner_e}", file=sys.stderr)
-
+        # Return 200 immediately so Twilio doesn't retry (processing takes 10-20s).
+        # process_webhook() runs in background after response is sent.
+        background_tasks.add_task(wa_handler.process_webhook, post_params)
         return JSONResponse({"status": "ok"})
 
     except Exception as e:
