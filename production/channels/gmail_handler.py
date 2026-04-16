@@ -102,7 +102,6 @@ class GmailHandler:
             project_id = os.environ.get("GOOGLE_CLOUD_PROJECT_ID", "")
             response = (
                 self.service.users()
-                .watches()
                 .watch(
                     userId="me",
                     body={
