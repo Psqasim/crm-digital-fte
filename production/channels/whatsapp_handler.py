@@ -22,8 +22,6 @@ from twilio.request_validator import RequestValidator
 # Module-level state
 # ---------------------------------------------------------------------------
 
-_seen_message_sids: set[str] = set()
-
 # Module-level singleton handler (used by webhooks endpoint)
 _handler_instance: "WhatsAppHandler | None" = None
 
@@ -99,10 +97,17 @@ class WhatsAppHandler:
                 print("[whatsapp_handler] WARNING: payload missing MessageSid", file=sys.stderr)
                 return None
 
-            # Idempotency gate
-            if message_sid in _seen_message_sids:
+            # --- Lazy imports to avoid circular dependencies ---
+            from production.database.queries import get_db_pool  # noqa: PLC0415
+            from production.database import queries  # noqa: PLC0415
+
+            pool = await get_db_pool()
+
+            # Idempotency gate — DB-level claim works across all uvicorn workers
+            claimed = await queries.claim_whatsapp_message(pool, message_sid)
+            if not claimed:
+                print(f"[whatsapp_handler] duplicate MessageSid {message_sid} — skipping", file=sys.stderr)
                 return None
-            _seen_message_sids.add(message_sid)
 
             # Extract and normalise fields
             from_raw = payload.get("From", "")
@@ -114,12 +119,6 @@ class WhatsAppHandler:
                 message_text = "[media attachment — no text]" if num_media > 0 else "[empty message]"
             else:
                 message_text = body_text
-
-            # --- Lazy imports to avoid circular dependencies ---
-            from production.database.queries import get_db_pool  # noqa: PLC0415
-            from production.database import queries  # noqa: PLC0415
-
-            pool = await get_db_pool()
 
             # Use phone as pseudo-email for DB customer lookup/creation
             clean_phone = customer_phone.lstrip("+").replace(" ", "")

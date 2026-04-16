@@ -54,6 +54,41 @@ async def get_db_pool() -> asyncpg.Pool:
 
 
 # ---------------------------------------------------------------------------
+# WhatsApp message deduplication (cross-worker safe)
+# ---------------------------------------------------------------------------
+
+
+async def claim_whatsapp_message(pool: asyncpg.Pool, message_sid: str) -> bool:
+    """Atomically claim a Twilio MessageSid so only one worker processes it.
+
+    Creates the whatsapp_message_log table on first call (idempotent).
+    Returns True if this worker claimed it (process the message).
+    Returns False if another worker already claimed it (skip).
+    """
+    try:
+        async with pool.acquire() as conn:
+            # Create table if not exists (safe to call every time — very cheap)
+            await conn.execute(
+                "CREATE TABLE IF NOT EXISTS whatsapp_message_log ("
+                "  message_sid TEXT PRIMARY KEY, "
+                "  claimed_at TIMESTAMPTZ DEFAULT NOW()"
+                ")"
+            )
+            # Try to insert — fails silently if already exists
+            result = await conn.execute(
+                "INSERT INTO whatsapp_message_log (message_sid) "
+                "VALUES ($1) ON CONFLICT (message_sid) DO NOTHING",
+                message_sid,
+            )
+            # INSERT returns 'INSERT 0 N' — N=1 means we inserted, N=0 means duplicate
+            return result == "INSERT 0 1"
+    except Exception:
+        logger.exception("claim_whatsapp_message failed for sid=%s — allowing processing", message_sid)
+        # On DB error, allow processing (better to duplicate than to silently drop)
+        return True
+
+
+# ---------------------------------------------------------------------------
 # Customer helpers
 # ---------------------------------------------------------------------------
 
