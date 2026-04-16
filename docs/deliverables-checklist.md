@@ -1,7 +1,7 @@
 # Deliverables Checklist — Submission Proof
 
 GIAIC Hackathon 5 — CRM Digital FTE Factory  
-Verified: 2026-04-08 | Branch: main
+Verified: 2026-04-14 | Branch: main
 
 ---
 
@@ -26,8 +26,8 @@ Verified: 2026-04-08 | Branch: main
 | PostgreSQL schema with multi-channel support | ✅ | `production/database/schema.sql` — 8 tables: customers, conversations, tickets, messages, knowledge_base, escalations, agents, metrics |
 | OpenAI Agents SDK implementation with channel-aware tools | ✅ | `production/agent/customer_success_agent.py` — 7 `@function_tool` tools, Pydantic schemas |
 | FastAPI service with all channel endpoints | ✅ | `production/api/` — 8 endpoints: /health, /support/submit, /support/ticket/{id}, /agent/process/{id}, /agent/process-pending, /metrics/summary, /metrics/channels, /webhooks/* |
-| Gmail integration (webhook handler + send) | ✅ | `production/channels/gmail_handler.py` — OAuth 2.0, Pub/Sub webhook |
-| WhatsApp/Twilio integration (webhook handler + send) | ✅ | `production/channels/whatsapp_handler.py` — HMAC-SHA1 validated, Twilio sandbox |
+| Gmail integration (webhook handler + send) | ✅ | `production/channels/gmail_handler.py` — OAuth 2.0, Pub/Sub push, direct-DB flow (no Kafka), INBOX-only filter, self-email loop prevention |
+| WhatsApp/Twilio integration (webhook handler + send) | ✅ | `production/channels/whatsapp_handler.py` — HMAC-SHA1 validated, BackgroundTasks (200ms return), DB-level dedup across workers |
 | Web Support Form (REQUIRED) — Complete React component in Next.js | ✅ | `src/web-form/` — Next.js 15 App Router, 4 pages: home, support form, ticket status, dashboard |
 | Kafka event streaming with channel-specific topics | ✅ | `production/channels/kafka_producer.py` + `production/kafka/` — Confluent Cloud, `support-tickets` topic |
 | Kubernetes manifests for deployment | ✅ | `production/k8s/` — deployments, services, configmaps for API + worker |
@@ -68,6 +68,12 @@ Verified: 2026-04-08 | Branch: main
 | Knowledge base seeded (pgvector) | ✅ | 11 chunks from `context/product-docs.md` via `text-embedding-3-small` |
 | Security audit | ✅ | No secrets in tracked files; `.env` in `.gitignore` |
 | Live demo deployed | ✅ | Frontend: Vercel · Backend: HF Spaces (psqasim-crm-digital-fte-api.hf.space) |
+| All 3 channels verified working in production | ✅ | Web Form, WhatsApp, Gmail tested end-to-end on live HF Spaces deployment (April 2026) |
+| WhatsApp human reply (agent → customer) | ✅ | Agent Reply box in dashboard → reply sent back via Twilio to customer's WhatsApp |
+| Escalation alert to admin WhatsApp | ✅ | Angry/complex tickets auto-escalate → admin gets 🚨 WhatsApp notification with ticket ID |
+| DB-level cross-worker message deduplication | ✅ | `whatsapp_message_log` + `gmail_message_log` tables — `ON CONFLICT DO NOTHING` prevents duplicate AI replies across multiple uvicorn workers |
+| Gmail INBOX-only processing | ✅ | `labelIds=["INBOX"]` filter applied at history-list and message-fetch level — prevents reply loops from own sent emails |
+| Zero-downtime Twilio webhook (BackgroundTasks) | ✅ | Webhook returns 200 in <200ms; full AI processing runs in background — eliminates Twilio 15s retry duplicates |
 
 ---
 
@@ -78,17 +84,17 @@ Verified: 2026-04-08 | Branch: main
 | Incubation Quality | 10 | 9 | Discovery log + spec + MCP + skills all complete |
 | Agent Implementation | 10 | 9 | 7 tools, channel-aware, proper error handling, 166 tests |
 | Web Support Form | 10 | 9 | 4-page Next.js 15 form, validation, status polling, dashboard |
-| Channel Integrations | 10 | 8 | Gmail + WhatsApp handlers complete; sandbox-tested |
+| Channel Integrations | 10 | 9 | All 3 channels live in production (April 2026); WhatsApp + Gmail verified end-to-end |
 | Database & Kafka | 5 | 5 | 8-table schema, pgvector, Confluent Cloud end-to-end |
 | Kubernetes Deployment | 5 | 4 | Manifests complete; local Minikube tested |
 | 24/7 Readiness | 10 | 7 | K8s health checks, restarts handled; no full 24h test |
 | Cross-Channel Continuity | 10 | 9 | Customer dedup by email, history retrieval, E2E tested |
 | Monitoring | 5 | 5 | Metrics endpoints + alerts.yaml |
 | Customer Experience | 10 | 9 | Channel templates, escalation rules, sentiment handling |
-| Documentation | 5 | 5 | Full docs/ folder with 6 guides |
+| Documentation | 5 | 5 | Full docs/ folder with 8 guides (incl. WhatsApp + Gmail channel setup guides) |
 | Creative Solutions | 5 | 4 | pgvector semantic search, PKT datetime injection |
 | Evolution Demonstration | 5 | 5 | `docs/project-evolution.md`, 16→166 test growth |
-| **Total** | **100** | **~89** | |
+| **Total** | **100** | **~91** | |
 
 ---
 
@@ -97,5 +103,6 @@ Verified: 2026-04-08 | Branch: main
 - ✅ Complete: **20 / 21** deliverable items
 - ⚠️ Partial: **1** (load test — infrastructure not deployed)
 - Tests: **176 passing**, 5 E2E tests (CI-safe)
+- All 3 channels live-verified in production (April 2026)
 - GitHub: https://github.com/Psqasim/crm-digital-fte
 - Live: https://psqasim-crm-digital-fte-api.hf.space/health

@@ -112,3 +112,8 @@ dmypy.json
 
 # Local Claude settings that may contain credentials
 .claude/settings.local.json
+
+# Gmail OAuth credentials (contain access + refresh tokens — never commit)
+gmail-authorized.json
+gmail-client-secret.json
+gmail_oauth.py

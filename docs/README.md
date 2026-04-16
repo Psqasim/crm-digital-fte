@@ -13,6 +13,8 @@
 | `web-form/` | [README.md](web-form/README.md) | Web form integration guide |
 | `auth/` | [auth.md](auth/auth.md) | Authentication + RBAC guide (NextAuth.js v5) |
 | `chat/` | [chat-agent.md](chat/chat-agent.md) | AI Chat widget guide (RAG, guardrails, API) |
+| `channels/` | [whatsapp.md](channels/whatsapp.md) | WhatsApp Twilio sandbox setup + troubleshooting |
+| `channels/` | [gmail.md](channels/gmail.md) | Gmail OAuth2 + Pub/Sub setup + troubleshooting |
 | — | [project-evolution.md](project-evolution.md) | Phase-by-phase evolution (incubation → production) |
 | — | [runbook.md](runbook.md) | Incident response runbook |
 | — | [deliverables-checklist.md](deliverables-checklist.md) | Hackathon submission checklist |

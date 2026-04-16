@@ -58,16 +58,33 @@ pinned: false
 
 ---
 
-## Features
+## What's Built
 
-- **3-channel support:** Gmail (email), WhatsApp (Twilio), Next.js web form
-- **AI agent with 7 tools:** knowledge base search, ticket creation, customer lookup, escalation, sentiment analysis, SLA check, history retrieval
-- **Real-time status:** ticket status polling via web form frontend
-- **Kafka streaming:** decoupled, scalable message queue (Confluent Cloud)
-- **pgvector semantic search:** OpenAI embeddings for knowledge base queries
-- **Structured logging:** JSON logs per request to stderr
-- **Monitoring:** `/health`, `/metrics/summary`, `/metrics/channels` endpoints
-- **Containerized:** Docker + Docker Compose + Kubernetes manifests
+### 3-Channel AI Customer Support (All Verified Working)
+
+| Channel | Status | How to test |
+|---------|--------|-------------|
+| 🌐 Web Form | ✅ Live | Go to `/support` → submit ticket → AI responds in ~30s |
+| 💬 WhatsApp | ✅ Live | Message **+1 415 523 8886** → AI responds on your phone |
+| 📧 Gmail | ✅ Live | Email `mmfake78@gmail.com` → AI replies to your inbox |
+| 🤖 Chat Widget | ✅ Live | Click blue bot icon (bottom-right) → instant Q&A |
+
+### Admin Features
+
+- 🔐 **Role-based auth** (admin/agent) — NextAuth.js v5 + bcrypt
+- 📊 **Admin dashboard** — all tickets, metrics, channel breakdown
+- 👤 **Staff management** — create agent accounts from dashboard
+- 💬 **Agent reply box** — reply to escalated tickets; reply sent back via original channel
+- 📱 **Escalation alerts** — admin gets WhatsApp 🚨 when ticket is escalated
+
+### AI Capabilities
+
+- OpenAI Agents SDK (gpt-4o-mini), 7 tools
+- RAG with pgvector — searches NexaFlow knowledge base (11 chunks)
+- Multilingual — detects Urdu/English, responds in same language
+- Sentiment analysis — escalates angry/complex tickets automatically
+- Prompt injection protection — refuses jailbreak attempts
+- 24/7 autonomous operation on HF Spaces
 
 ---
 
@@ -75,15 +92,15 @@ pinned: false
 
 | Layer | Technology |
 |-------|-----------|
-| Agent Runtime | Python 3.12 + OpenAI Agents SDK |
-| API Server | FastAPI |
+| Frontend | Next.js 16, TypeScript, Tailwind CSS, shadcn/ui |
+| Backend | FastAPI, Python 3.12 |
+| AI Agent | OpenAI Agents SDK, gpt-4o-mini |
 | Database | Neon PostgreSQL + pgvector |
 | Message Queue | Apache Kafka (Confluent Cloud) |
-| Frontend | Next.js 15 App Router |
-| Email Channel | Gmail API (OAuth 2.0) |
-| WhatsApp Channel | Twilio WhatsApp Business API |
-| Containers | Docker + Docker Compose |
-| Orchestration | Kubernetes (Minikube / Oracle Cloud VM) |
+| Channels | Gmail API (OAuth2), Twilio WhatsApp, Web Form |
+| Auth | NextAuth.js v5, JWT, RBAC |
+| Deployment | Vercel (frontend) + HF Spaces (backend) |
+| Containers | Docker + Kubernetes manifests |
 
 ---
 
