@@ -80,6 +80,19 @@ async def lifespan(app: FastAPI):
     worker_task = asyncio.create_task(_ticket_processor_loop())
     logger.info("[lifespan] background ticket processor started")
 
+    # Set up Gmail credentials and register Pub/Sub watch
+    try:
+        from production.channels.gmail_handler import _get_handler as _get_gmail_handler  # noqa: PLC0415
+        gmail = _get_gmail_handler()
+        await gmail.setup_credentials()
+        if gmail.service is not None:
+            await gmail.watch_inbox()
+            logger.info("[lifespan] Gmail watch registered")
+        else:
+            logger.warning("[lifespan] Gmail credentials not set — email channel disabled")
+    except Exception:
+        logger.exception("[lifespan] Gmail setup failed — continuing without email channel")
+
     yield
 
     worker_task.cancel()

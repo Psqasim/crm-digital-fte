@@ -89,6 +89,37 @@ async def claim_whatsapp_message(pool: asyncpg.Pool, message_sid: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Gmail message deduplication (cross-worker safe)
+# ---------------------------------------------------------------------------
+
+
+async def claim_gmail_message(pool: asyncpg.Pool, message_id: str) -> bool:
+    """Atomically claim a Gmail message ID so only one worker processes it.
+
+    Creates the gmail_message_log table on first call (idempotent).
+    Returns True if this worker claimed it (process the message).
+    Returns False if another worker already claimed it (skip).
+    """
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "CREATE TABLE IF NOT EXISTS gmail_message_log ("
+                "  message_id TEXT PRIMARY KEY, "
+                "  claimed_at TIMESTAMPTZ DEFAULT NOW()"
+                ")"
+            )
+            result = await conn.execute(
+                "INSERT INTO gmail_message_log (message_id) "
+                "VALUES ($1) ON CONFLICT (message_id) DO NOTHING",
+                message_id,
+            )
+            return result == "INSERT 0 1"
+    except Exception:
+        logger.exception("claim_gmail_message failed for id=%s — allowing processing", message_id)
+        return True
+
+
+# ---------------------------------------------------------------------------
 # Customer helpers
 # ---------------------------------------------------------------------------
 

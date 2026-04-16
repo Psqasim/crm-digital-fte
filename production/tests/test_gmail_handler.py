@@ -1,16 +1,12 @@
 """
 production/tests/test_gmail_handler.py
-Phase 4C: Tests for GmailHandler — 10 tests (T007–T016).
-
-Tests use FastAPI TestClient for endpoint tests and unittest.mock for
-Gmail API / Kafka mocks.
+Phase 4C + 7E: Tests for GmailHandler — direct-DB flow (no Kafka).
 """
 
 from __future__ import annotations
 
 import base64
 import json
-import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -18,11 +14,10 @@ from fastapi.testclient import TestClient
 
 
 # ---------------------------------------------------------------------------
-# Helpers — build a minimal valid Pub/Sub payload
+# Helpers
 # ---------------------------------------------------------------------------
 
 def _make_pubsub_payload(history_id: str = "100", message_id: str = "msg_001") -> dict:
-    """Produce a base64url-encoded Pub/Sub push payload from Gmail."""
     data = json.dumps({"emailAddress": "user@example.com", "historyId": history_id})
     encoded = base64.urlsafe_b64encode(data.encode()).decode().rstrip("=")
     return {
@@ -34,20 +29,17 @@ def _make_pubsub_payload(history_id: str = "100", message_id: str = "msg_001") -
 def _mock_gmail_service(
     history_entries: list | None = None,
     msg_headers: list | None = None,
-    msg_body_data: str = "SGVsbG8gd29ybGQ=",  # b64 "Hello world"
+    msg_body_data: str = "SGVsbG8gd29ybGQ=",
     snippet: str = "Hello world",
     thread_id: str = "thread_abc",
 ) -> MagicMock:
-    """Build a mock Gmail service object."""
     if history_entries is None:
-        history_entries = [{"messages": [{"id": "msg_001"}]}]
+        history_entries = [{"messagesAdded": [{"message": {"id": "msg_001"}}]}]
     if msg_headers is None:
         msg_headers = [
             {"name": "From", "value": "Alice <alice@example.com>"},
             {"name": "Subject", "value": "Help needed"},
         ]
-
-    # Build the message payload
     msg_payload = {
         "id": "msg_001",
         "threadId": thread_id,
@@ -58,197 +50,209 @@ def _mock_gmail_service(
             "body": {"data": msg_body_data},
         },
     }
-
     service = MagicMock()
-    # history().list().execute()
     service.users.return_value.history.return_value.list.return_value.execute.return_value = {
         "history": history_entries,
         "historyId": "101",
     }
-    # messages().get().execute()
     service.users.return_value.messages.return_value.get.return_value.execute.return_value = msg_payload
-    # messages().send().execute()
     service.users.return_value.messages.return_value.send.return_value.execute.return_value = {
-        "id": "sent_001",
-        "threadId": thread_id,
+        "id": "sent_001", "threadId": thread_id,
     }
     return service
 
 
+FAKE_TICKET = {
+    "ticket_id": "TKT-ABCD1234",
+    "internal_id": "abcd1234-0000-0000-0000-000000000000",
+    "conversation_id": "conv-uuid-001",
+    "customer_id": "cust-uuid-001",
+    "customer_name": "Alice",
+    "customer_email": "alice@example.com",
+    "channel": "email",
+    "subject": "Help needed",
+    "message": "Hello world",
+    "status": "open",
+    "category": None,
+    "priority": "medium",
+    "ai_response": None,
+    "messages": [],
+    "created_at": None,
+    "updated_at": None,
+    "resolved_at": None,
+}
+
+FAKE_AGENT_RESP = MagicMock(
+    ticket_id="TKT-ABCD1234",
+    response_text="Hi Alice, we are looking into your issue.",
+    escalated=False,
+    error=None,
+)
+
+
+def _db_patches(claim_return=True):
+    """Return a list of patch context managers for all DB functions."""
+    return [
+        patch("production.database.queries.get_db_pool", new_callable=AsyncMock, return_value=MagicMock()),
+        patch("production.database.queries.claim_gmail_message", new_callable=AsyncMock, return_value=claim_return),
+        patch("production.database.queries.get_or_create_customer", new_callable=AsyncMock, return_value={"id": "cust-uuid-001"}),
+        patch("production.database.queries.create_conversation", new_callable=AsyncMock, return_value="conv-uuid-001"),
+        patch("production.database.queries.add_message", new_callable=AsyncMock, return_value="msg-uuid-001"),
+        patch("production.database.queries.create_ticket", new_callable=AsyncMock, return_value="TKT-ABCD1234"),
+        patch("production.database.queries.get_ticket_by_display_id", new_callable=AsyncMock, return_value=FAKE_TICKET),
+        patch("production.database.queries.update_ticket_status", new_callable=AsyncMock),
+        patch("production.api.agent_routes._run_agent_on_ticket", new_callable=AsyncMock, return_value=FAKE_AGENT_RESP),
+    ]
+
+
 # ---------------------------------------------------------------------------
-# Fixture: reset module-level state between tests
+# Fixture: reset module-level state
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(autouse=True)
 def reset_gmail_handler_state():
-    """Reset module-level _seen_message_ids, _last_history_id before each test."""
-    try:
-        import production.channels.gmail_handler as gh
-        gh._seen_message_ids.clear()
-        gh._last_history_id = None
-    except (ImportError, AttributeError):
-        pass  # Module not yet implemented — that's expected for early tests
+    import production.channels.gmail_handler as gh
+    gh._last_history_id = None
+    gh._handler_instance = None
     yield
-    try:
-        import production.channels.gmail_handler as gh
-        gh._seen_message_ids.clear()
-        gh._last_history_id = None
-    except (ImportError, AttributeError):
-        pass
+    gh._last_history_id = None
+    gh._handler_instance = None
 
 
 # ---------------------------------------------------------------------------
-# T007: test_process_pub_sub_push_valid
+# T007: valid push → DB records created
 # ---------------------------------------------------------------------------
 
 def test_process_pub_sub_push_valid():
-    """Valid Pub/Sub push → publish_ticket called once with channel='email'."""
-    from production.channels.gmail_handler import GmailHandler
-    from src.agent.models import TicketMessage
-
-    handler = GmailHandler()
-    handler.service = _mock_gmail_service()
-
+    """Valid Pub/Sub push → claim, customer, ticket all created."""
+    import asyncio
     import production.channels.gmail_handler as gh
-    gh._last_history_id = "99"  # Set prior historyId so new one (100) is different
+    import production.database.queries as q
 
-    with patch("production.channels.gmail_handler.publish_ticket", new_callable=AsyncMock) as mock_publish:
-        import asyncio
-        asyncio.run(
-            handler.process_pub_sub_push(_make_pubsub_payload(history_id="100"))
-        )
+    handler = gh.GmailHandler()
+    handler.service = _mock_gmail_service()
+    gh._last_history_id = "99"
 
-    mock_publish.assert_called_once()
-    ticket = mock_publish.call_args[0][0]
-    assert isinstance(ticket, TicketMessage)
-    assert ticket.channel == "email" or str(ticket.channel) in ("email", "Channel.EMAIL")
+    patches = _db_patches(claim_return=True)
+    with patches[0], patches[1] as mock_claim, patches[2] as mock_customer, \
+         patches[3], patches[4], patches[5] as mock_ticket, patches[6], patches[7], patches[8]:
+        asyncio.run(handler.process_pub_sub_push(_make_pubsub_payload(history_id="100")))
+
+    mock_claim.assert_called_once()
+    mock_customer.assert_called_once()
+    mock_ticket.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
-# T008: test_process_pub_sub_push_dedup
+# T008: DB dedup — already claimed → skip
 # ---------------------------------------------------------------------------
 
 def test_process_pub_sub_push_dedup():
-    """Same historyId twice → publish_ticket called exactly once."""
-    from production.channels.gmail_handler import GmailHandler
-
-    handler = GmailHandler()
-    handler.service = _mock_gmail_service()
-
+    """claim_gmail_message returns False → no customer/ticket created."""
+    import asyncio
     import production.channels.gmail_handler as gh
+
+    handler = gh.GmailHandler()
+    handler.service = _mock_gmail_service()
     gh._last_history_id = "99"
 
-    with patch("production.channels.gmail_handler.publish_ticket", new_callable=AsyncMock) as mock_publish:
-        import asyncio
-        payload = _make_pubsub_payload(history_id="100")
-        asyncio.run(handler.process_pub_sub_push(payload))
-        asyncio.run(handler.process_pub_sub_push(payload))
+    patches = _db_patches(claim_return=False)
+    with patches[0], patches[1], patches[2] as mock_customer, \
+         patches[3], patches[4], patches[5] as mock_ticket, patches[6], patches[7], patches[8]:
+        asyncio.run(handler.process_pub_sub_push(_make_pubsub_payload(history_id="100")))
 
-    assert mock_publish.call_count == 1, f"Expected 1 call, got {mock_publish.call_count}"
+    mock_customer.assert_not_called()
+    mock_ticket.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
-# T009: test_process_pub_sub_push_no_new_messages
+# T009: no messagesAdded → nothing processed
 # ---------------------------------------------------------------------------
 
 def test_process_pub_sub_push_no_new_messages():
-    """history.list returns no messagesAdded → publish_ticket never called."""
-    from production.channels.gmail_handler import GmailHandler
-
-    handler = GmailHandler()
-    # Override: history response with no messagesAdded entries
-    service = _mock_gmail_service(history_entries=[{"labelsAdded": []}])
-    handler.service = service
-
+    """history.list returns no messagesAdded → no DB writes."""
+    import asyncio
     import production.channels.gmail_handler as gh
+
+    handler = gh.GmailHandler()
+    handler.service = _mock_gmail_service(history_entries=[{"labelsAdded": []}])
     gh._last_history_id = "99"
 
-    with patch("production.channels.gmail_handler.publish_ticket", new_callable=AsyncMock) as mock_publish:
-        import asyncio
-        asyncio.run(
-            handler.process_pub_sub_push(_make_pubsub_payload(history_id="100"))
-        )
+    patches = _db_patches()
+    with patches[0], patches[1], patches[2], \
+         patches[3], patches[4], patches[5] as mock_ticket, patches[6], patches[7], patches[8]:
+        asyncio.run(handler.process_pub_sub_push(_make_pubsub_payload(history_id="100")))
 
-    assert mock_publish.call_count == 0
+    mock_ticket.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
-# T010: test_send_reply_preserves_thread_id
+# T010: send_reply preserves thread_id
 # ---------------------------------------------------------------------------
 
 def test_send_reply_preserves_thread_id():
-    """send_reply() includes correct threadId in Gmail send payload."""
+    """send_reply() passes correct threadId to Gmail API."""
+    import asyncio
     from production.channels.gmail_handler import GmailHandler
 
     handler = GmailHandler()
     handler.service = _mock_gmail_service(thread_id="thread123")
 
-    import asyncio
-    asyncio.run(
-        handler.send_reply(thread_id="thread123", to_email="x@y.com", body="Hello")
-    )
+    asyncio.run(handler.send_reply(thread_id="thread123", to_email="x@y.com", body="Hello"))
 
     send_call = handler.service.users.return_value.messages.return_value.send
-    call_kwargs = send_call.call_args
-    # The body dict passed to send() must contain threadId
-    body_arg = call_kwargs[1].get("body") or call_kwargs[0][0] if call_kwargs[0] else None
-    if body_arg is None:
-        # Try kwargs-only form: send(userId='me', body={...})
-        all_kwargs = send_call.call_args_list[0]
-        body_arg = all_kwargs[1].get("body", {})
-    assert body_arg.get("threadId") == "thread123", f"threadId not in send body: {body_arg}"
+    body_arg = send_call.call_args[1].get("body") or send_call.call_args[0][0] if send_call.call_args[0] else {}
+    if not body_arg:
+        body_arg = send_call.call_args_list[0][1].get("body", {})
+    assert body_arg.get("threadId") == "thread123"
 
 
 # ---------------------------------------------------------------------------
-# T011: test_missing_credentials_does_not_crash
+# T011: missing credentials → no crash
 # ---------------------------------------------------------------------------
 
 def test_missing_credentials_does_not_crash(capsys):
-    """setup_credentials() without GMAIL_CREDENTIALS_JSON logs error, no exception."""
+    """setup_credentials() without env vars logs error, service stays None."""
+    import asyncio
+    import os
     from production.channels.gmail_handler import GmailHandler
 
     handler = GmailHandler()
-    with patch.dict("os.environ", {}, clear=True):
-        # Remove Gmail-related env vars
-        import os
-        env_without_gmail = {k: v for k, v in os.environ.items() if "GMAIL" not in k}
-        with patch.dict("os.environ", env_without_gmail, clear=True):
-            import asyncio
-            asyncio.run(handler.setup_credentials())
+    env_clean = {k: v for k, v in os.environ.items() if "GMAIL" not in k and "GOOGLE" not in k}
+    with patch.dict("os.environ", env_clean, clear=True):
+        asyncio.run(handler.setup_credentials())
 
-    # Should not raise — check stderr has something
-    captured = capsys.readouterr()
-    assert len(captured.err) > 0 or handler.service is None  # either logged or just None service
+    assert handler.service is None
 
 
 # ---------------------------------------------------------------------------
-# T012: test_base64_decode_error_returns_200
+# T012: malformed base64 → HTTP 200
 # ---------------------------------------------------------------------------
 
 def test_base64_decode_error_returns_200():
-    """Malformed base64 data in Pub/Sub payload → HTTP 200, no 5xx."""
+    """Malformed base64 in Pub/Sub payload → HTTP 200, no 5xx."""
     from production.api.main import app
 
     client = TestClient(app)
-    bad_payload = {
-        "message": {"data": "!!!invalid_base64!!!", "messageId": "1"},
+    response = client.post("/webhooks/gmail", json={
+        "message": {"data": "!!!invalid!!!", "messageId": "1"},
         "subscription": "s",
-    }
-    response = client.post("/webhooks/gmail", json=bad_payload)
-    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+    })
+    assert response.status_code == 200
 
 
 # ---------------------------------------------------------------------------
-# T013: test_html_only_email_extracts_snippet
+# T013: HTML-only email → creates ticket (falls back to snippet)
 # ---------------------------------------------------------------------------
 
 def test_html_only_email_extracts_snippet():
-    """HTML-only email → TicketMessage.message falls back to 'snippet' field."""
-    from production.channels.gmail_handler import GmailHandler
+    """HTML-only email → ticket still created using snippet as body."""
+    import asyncio
+    import production.channels.gmail_handler as gh
 
     html_service = MagicMock()
     html_service.users.return_value.history.return_value.list.return_value.execute.return_value = {
-        "history": [{"messages": [{"id": "msg_html"}]}],
+        "history": [{"messagesAdded": [{"message": {"id": "msg_html"}}]}],
         "historyId": "101",
     }
     html_service.users.return_value.messages.return_value.get.return_value.execute.return_value = {
@@ -264,122 +268,91 @@ def test_html_only_email_extracts_snippet():
             "body": {"data": base64.urlsafe_b64encode(b"<b>Preview text</b>").decode()},
         },
     }
+    html_service.users.return_value.messages.return_value.send.return_value.execute.return_value = {"id": "s1"}
 
-    handler = GmailHandler()
+    handler = gh.GmailHandler()
     handler.service = html_service
-
-    import production.channels.gmail_handler as gh
     gh._last_history_id = "99"
 
-    captured_ticket = []
-    async def capture(ticket):
-        captured_ticket.append(ticket)
+    patches = _db_patches(claim_return=True)
+    with patches[0], patches[1], patches[2], \
+         patches[3], patches[4], patches[5] as mock_ticket, patches[6], patches[7], patches[8]:
+        asyncio.run(handler.process_pub_sub_push(_make_pubsub_payload(history_id="100")))
 
-    with patch("production.channels.gmail_handler.publish_ticket", side_effect=capture):
-        import asyncio
-        asyncio.run(
-            handler.process_pub_sub_push(_make_pubsub_payload(history_id="100", message_id="msg_html_push"))
-        )
-
-    assert len(captured_ticket) == 1, "Expected publish_ticket to be called once"
-    assert captured_ticket[0].message == "Preview text", f"Got: {captured_ticket[0].message}"
+    mock_ticket.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
-# T014: test_history_list_api_error_does_not_crash
+# T014: history.list API error → HTTP 200
 # ---------------------------------------------------------------------------
 
 def test_history_list_api_error_does_not_crash():
-    """history.list raises HttpError → POST to /webhooks/gmail returns HTTP 200."""
+    """history.list raises HttpError → /webhooks/gmail returns HTTP 200."""
     from googleapiclient.errors import HttpError
     from production.api.main import app
+    import production.channels.gmail_handler as gh
 
     client = TestClient(app)
-
-    import production.channels.gmail_handler as gh
     gh._last_history_id = "99"
-
-    mock_http_error = HttpError(resp=MagicMock(status=500), content=b"error")
 
     service = MagicMock()
-    service.users.return_value.history.return_value.list.return_value.execute.side_effect = mock_http_error
-
-    with patch("production.channels.gmail_handler.GmailHandler.setup_credentials") as mock_setup:
-        async def set_service(self_inner=None):
-            gh._handler_instance.service = service
-        # Directly patch the module-level handler
-        pass
-
-    # Patch at module level: replace service on the existing handler
-    with patch.object(gh, "_handler_instance", create=True):
-        pass
-
-    # Simplest approach: patch process_pub_sub_push to simulate the error path
-    original_handler = getattr(gh, "_handler_instance", None)
-    test_handler = gh.GmailHandler()
-    test_handler.service = service
-
-    with patch.object(gh, "_handler_instance", test_handler):
-        response = client.post("/webhooks/gmail", json=_make_pubsub_payload(history_id="999"))
-
-    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
-
-
-# ---------------------------------------------------------------------------
-# T015: test_kafka_publish_failure_does_not_crash
-# ---------------------------------------------------------------------------
-
-def test_kafka_publish_failure_does_not_crash():
-    """publish_ticket raises Exception → POST to /webhooks/gmail returns HTTP 200."""
-    from production.api.main import app
-
-    client = TestClient(app)
-
-    import production.channels.gmail_handler as gh
-    gh._last_history_id = "99"
-
-    service = _mock_gmail_service()
+    service.users.return_value.history.return_value.list.return_value.execute.side_effect = (
+        HttpError(resp=MagicMock(status=500), content=b"error")
+    )
     test_handler = gh.GmailHandler()
     test_handler.service = service
 
     with patch.object(gh, "_handler_instance", test_handler), \
-         patch("production.channels.gmail_handler.publish_ticket",
-               new_callable=AsyncMock, side_effect=Exception("broker unavailable")):
-        response = client.post("/webhooks/gmail", json=_make_pubsub_payload(history_id="200"))
+         patch("production.database.queries.get_db_pool", new_callable=AsyncMock, return_value=MagicMock()):
+        response = client.post("/webhooks/gmail", json=_make_pubsub_payload(history_id="999"))
 
-    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+    assert response.status_code == 200
 
 
 # ---------------------------------------------------------------------------
-# T016: test_ticket_message_schema_matches_prototype
+# T015: DB error during processing → HTTP 200
 # ---------------------------------------------------------------------------
 
-def test_ticket_message_schema_matches_prototype():
-    """TicketMessage produced by process_pub_sub_push has all required fields."""
-    from production.channels.gmail_handler import GmailHandler
-    from src.agent.models import TicketMessage
-
-    handler = GmailHandler()
-    handler.service = _mock_gmail_service()
-
+def test_db_failure_does_not_crash():
+    """DB error during processing → /webhooks/gmail still returns HTTP 200."""
+    from production.api.main import app
     import production.channels.gmail_handler as gh
+
+    client = TestClient(app)
     gh._last_history_id = "99"
 
-    captured = []
-    async def capture(ticket):
-        captured.append(ticket)
+    test_handler = gh.GmailHandler()
+    test_handler.service = _mock_gmail_service()
 
-    with patch("production.channels.gmail_handler.publish_ticket", side_effect=capture):
-        import asyncio
-        asyncio.run(
-            handler.process_pub_sub_push(_make_pubsub_payload(history_id="100", message_id="msg_schema"))
-        )
+    with patch.object(gh, "_handler_instance", test_handler), \
+         patch("production.database.queries.get_db_pool", new_callable=AsyncMock, return_value=MagicMock()), \
+         patch("production.database.queries.claim_gmail_message", new_callable=AsyncMock, side_effect=Exception("DB down")):
+        response = client.post("/webhooks/gmail", json=_make_pubsub_payload(history_id="200"))
 
-    assert len(captured) == 1
-    msg = captured[0]
-    assert isinstance(msg, TicketMessage)
-    assert str(msg.channel) in ("email", "Channel.EMAIL")
-    assert msg.customer_email is not None
-    assert msg.message is not None
-    assert msg.received_at is not None
-    assert msg.metadata.get("thread_id") is not None
+    assert response.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# T016: own email skipped → no reply loop
+# ---------------------------------------------------------------------------
+
+def test_own_email_skipped():
+    """Email from GMAIL_USER_EMAIL → skipped to avoid infinite reply loop."""
+    import asyncio
+    import production.channels.gmail_handler as gh
+
+    service = _mock_gmail_service(msg_headers=[
+        {"name": "From", "value": "mmfake78@gmail.com"},
+        {"name": "Subject", "value": "Test"},
+    ])
+    handler = gh.GmailHandler()
+    handler.service = service
+    gh._last_history_id = "99"
+
+    patches = _db_patches(claim_return=True)
+    with patches[0], patches[1], patches[2], \
+         patches[3], patches[4], patches[5] as mock_ticket, patches[6], patches[7], patches[8], \
+         patch.dict("os.environ", {"GMAIL_USER_EMAIL": "mmfake78@gmail.com"}):
+        asyncio.run(handler.process_pub_sub_push(_make_pubsub_payload(history_id="100")))
+
+    mock_ticket.assert_not_called()

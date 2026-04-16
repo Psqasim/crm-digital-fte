@@ -1,18 +1,17 @@
 """
 production/channels/gmail_handler.py
-Phase 4C: Gmail channel handler — Pub/Sub push → TicketMessage → Kafka.
+Phase 4C + 7E: Gmail channel handler — Pub/Sub push → DB → AI agent → reply.
 
 Flow:
   1. Gmail Pub/Sub push notification → /webhooks/gmail
-  2. process_pub_sub_push() decodes historyId, deduplicates, calls history.list
-  3. For each new message: fetch full content → build TicketMessage → publish_ticket()
+  2. process_pub_sub_push() decodes historyId, deduplicates via DB
+  3. For each new message: fetch full content → write to DB → run AI agent
   4. send_reply() sends a threaded Gmail reply back to the customer
 """
 
 from __future__ import annotations
 
 import base64
-import dataclasses
 import email.mime.text
 import json
 import os
@@ -22,14 +21,10 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from production.channels.kafka_producer import publish_ticket
-from src.agent.models import Channel, TicketMessage
-
 # ---------------------------------------------------------------------------
 # Module-level state
 # ---------------------------------------------------------------------------
 
-_seen_message_ids: set[str] = set()
 _last_history_id: str | None = None
 
 # Module-level singleton handler (used by webhooks endpoint)
@@ -60,26 +55,31 @@ class GmailHandler:
     # ------------------------------------------------------------------
 
     async def setup_credentials(self) -> None:
-        """Load Gmail API credentials from GMAIL_CREDENTIALS_JSON env var.
+        """Load Gmail API credentials from GMAIL_CREDENTIALS_JSON_CONTENT env var.
 
-        Errors are logged to stderr; never raises.
+        Reads JSON content directly from env var (no file needed on HF Spaces).
+        Falls back to GMAIL_CREDENTIALS_JSON file path if content var not set.
         """
         try:
-            creds_path = os.environ.get("GMAIL_CREDENTIALS_JSON")
-            if not creds_path:
-                raise KeyError("GMAIL_CREDENTIALS_JSON not set")
-
             from google.oauth2.credentials import Credentials
             from googleapiclient.discovery import build
 
-            creds = Credentials.from_authorized_user_file(
-                creds_path,
-                scopes=["https://www.googleapis.com/auth/gmail.modify"],
-            )
+            scopes = ["https://www.googleapis.com/auth/gmail.modify"]
+
+            # Prefer JSON content from env var (HF Spaces secrets)
+            creds_content = os.environ.get("GMAIL_CREDENTIALS_JSON_CONTENT", "").strip()
+            if creds_content:
+                creds_dict = json.loads(creds_content)
+                creds = Credentials.from_authorized_user_info(creds_dict, scopes=scopes)
+            else:
+                # Fallback: file path (local dev)
+                creds_path = os.environ.get("GMAIL_CREDENTIALS_JSON")
+                if not creds_path:
+                    raise KeyError("Neither GMAIL_CREDENTIALS_JSON_CONTENT nor GMAIL_CREDENTIALS_JSON is set")
+                creds = Credentials.from_authorized_user_file(creds_path, scopes=scopes)
+
             self.service = build("gmail", "v1", credentials=creds)
-        except (FileNotFoundError, KeyError) as e:
-            print(f"[gmail_handler] credentials error: {type(e).__name__}: {e}", file=sys.stderr)
-            self.service = None
+            print("[gmail_handler] credentials loaded OK", file=sys.stderr)
         except Exception as e:
             print(f"[gmail_handler] ERROR in setup_credentials: {type(e).__name__}: {e}", file=sys.stderr)
             self.service = None
@@ -91,7 +91,7 @@ class GmailHandler:
     async def watch_inbox(self) -> dict:
         """Register Gmail inbox watch for Pub/Sub push notifications.
 
-        Stores returned historyId in module-level _last_history_id.
+        Must be called on startup and renewed every 7 days.
         Returns the full API response dict, or {} on error.
         """
         global _last_history_id
@@ -113,6 +113,7 @@ class GmailHandler:
                 .execute()
             )
             _last_history_id = response.get("historyId")
+            print(f"[gmail_handler] watch registered, historyId={_last_history_id}", file=sys.stderr)
             return response
         except Exception as e:
             print(f"[gmail_handler] ERROR in watch_inbox: {type(e).__name__}: {e}", file=sys.stderr)
@@ -123,76 +124,67 @@ class GmailHandler:
     # ------------------------------------------------------------------
 
     async def process_pub_sub_push(self, payload: dict) -> None:
-        """Decode a Gmail Pub/Sub push payload and publish TicketMessages.
+        """Decode a Gmail Pub/Sub push payload, write to DB, run AI agent.
 
         Steps:
         1. Decode base64url data → extract historyId
-        2. Idempotency gate: if historyId == _last_history_id → return (no-op)
-        3. Call history.list(startHistoryId=_last_history_id)
-        4. For each new message: fetch, normalise, publish
-        5. Update _last_history_id
+        2. Call history.list to find new messages
+        3. For each new message: fetch → write to DB → run agent → reply
         """
-        global _last_history_id, _seen_message_ids
+        global _last_history_id
         try:
             # Step 1: decode payload
             raw_data = payload["message"]["data"]
-            # Pad base64 to multiple of 4
             padded = raw_data + "=="
             decoded_bytes = base64.urlsafe_b64decode(padded)
             notification = json.loads(decoded_bytes)
             history_id = str(notification.get("historyId", ""))
 
-            # Step 2: idempotency gate
-            if history_id == _last_history_id:
+            if not history_id:
                 return
 
-            # Step 3: call history.list
             if self.service is None:
-                print("[gmail_handler] WARNING: process_pub_sub_push called with no service", file=sys.stderr)
+                print("[gmail_handler] WARNING: no service — skipping", file=sys.stderr)
                 _last_history_id = history_id
                 return
 
+            # Step 2: fetch history since last known ID
             start_id = _last_history_id or history_id
             history_response = (
                 self.service.users()
                 .history()
-                .list(userId="me", startHistoryId=start_id)
+                .list(userId="me", startHistoryId=start_id, historyTypes=["messageAdded"])
                 .execute()
             )
             history_entries = history_response.get("history", [])
 
-            # Step 4: process each new message
-            for entry in history_entries:
-                for msg_stub in entry.get("messages", entry.get("messagesAdded", [])):
-                    # Support both formats: direct message stub or {message: {...}}
-                    if "message" in msg_stub:
-                        msg_id = msg_stub["message"]["id"]
-                    else:
-                        msg_id = msg_stub.get("id", "")
+            # Step 3: process each new message
+            from production.database.queries import get_db_pool  # noqa: PLC0415
+            from production.database import queries  # noqa: PLC0415
 
-                    if not msg_id or msg_id in _seen_message_ids:
+            pool = await get_db_pool()
+
+            for entry in history_entries:
+                for msg_stub in entry.get("messagesAdded", []):
+                    msg_id = msg_stub.get("message", {}).get("id", "")
+                    if not msg_id:
                         continue
 
-                    ticket = await self._fetch_and_normalise(msg_id, history_id)
-                    if ticket is not None:
-                        try:
-                            await publish_ticket(ticket)
-                        except Exception as kafka_err:
-                            print(f"[gmail_handler] Kafka publish error: {kafka_err}", file=sys.stderr)
-                        _seen_message_ids.add(msg_id)
+                    # DB-level dedup
+                    claimed = await queries.claim_gmail_message(pool, msg_id)
+                    if not claimed:
+                        print(f"[gmail_handler] duplicate msg_id {msg_id} — skipping", file=sys.stderr)
+                        continue
 
-            # Step 5: update state
+                    await self._process_single_message(pool, queries, msg_id)
+
             _last_history_id = history_id
 
         except Exception as e:
             print(f"[gmail_handler] ERROR in process_pub_sub_push: {type(e).__name__}: {e}", file=sys.stderr)
 
-    # ------------------------------------------------------------------
-    # Fetch and normalise a single Gmail message
-    # ------------------------------------------------------------------
-
-    async def _fetch_and_normalise(self, msg_id: str, history_id: str) -> TicketMessage | None:
-        """Fetch full message and return a TicketMessage, or None on error."""
+    async def _process_single_message(self, pool, queries, msg_id: str) -> None:
+        """Fetch one Gmail message, create DB records, run agent, send reply."""
         try:
             msg = (
                 self.service.users()
@@ -202,41 +194,63 @@ class GmailHandler:
             )
 
             thread_id = msg.get("threadId", "")
-            snippet = msg.get("snippet", "")
             payload_part = msg.get("payload", {})
             headers = payload_part.get("headers", [])
 
-            # Extract headers
             from_header = next((h["value"] for h in headers if h["name"] == "From"), "")
             subject = next((h["value"] for h in headers if h["name"] == "Subject"), "(no subject)")
 
-            # Parse email address from "Name <email@example.com>"
             customer_email = self._extract_email_address(from_header)
-            customer_name = self._extract_display_name(from_header)
+            customer_name = self._extract_display_name(from_header) or customer_email or "Customer"
+            body = self._extract_body(payload_part, msg.get("snippet", ""))[:4000]
 
-            # Extract body: text/plain preferred, fallback to snippet
-            body = self._extract_body(payload_part, snippet)
-            body = body[:4000]  # truncate to 4000 chars
+            # Skip emails from ourselves (avoid reply loops)
+            my_email = os.environ.get("GMAIL_USER_EMAIL", "").strip().lower()
+            if customer_email.lower() == my_email:
+                print(f"[gmail_handler] skipping own email from {customer_email}", file=sys.stderr)
+                return
 
-            return TicketMessage(
-                id=str(uuid.uuid4()),
-                channel=Channel.EMAIL,
-                customer_name=customer_name or customer_email or "Unknown",
-                customer_email=customer_email,
-                customer_phone=None,
-                subject=subject,
-                message=body,
-                received_at=datetime.now(ZoneInfo("Asia/Karachi")).isoformat(),
-                metadata={
-                    "thread_id": thread_id,
-                    "message_id": msg_id,
-                    "subject": subject,
-                    "gmail_history_id": history_id,
-                },
+            # Write to DB
+            customer = await queries.get_or_create_customer(pool, customer_email, name=customer_name)
+            if customer is None:
+                print("[gmail_handler] ERROR: could not get/create customer", file=sys.stderr)
+                return
+            customer_id = str(customer["id"])
+
+            conversation_id = await queries.create_conversation(pool, customer_id, "email")
+            if not conversation_id:
+                print("[gmail_handler] ERROR: could not create conversation", file=sys.stderr)
+                return
+
+            await queries.add_message(pool, conversation_id, role="customer", content=body, channel="email")
+
+            internal_ticket_id = await queries.create_ticket(
+                pool, conversation_id, customer_id,
+                channel="email", subject=subject[:100],
             )
+            if not internal_ticket_id:
+                print("[gmail_handler] ERROR: could not create ticket", file=sys.stderr)
+                return
+
+            # Reload ticket for agent
+            ticket = await queries.get_ticket_by_display_id(pool, internal_ticket_id)
+            if not ticket:
+                return
+
+            # Run AI agent
+            from production.api.agent_routes import _run_agent_on_ticket  # noqa: PLC0415
+            agent_resp = await _run_agent_on_ticket(pool, ticket)
+
+            # Send Gmail reply
+            if agent_resp and agent_resp.response_text:
+                await self.send_reply(thread_id, customer_email, agent_resp.response_text)
+                print(
+                    f"[gmail_handler] replied to {customer_email} for ticket {ticket['ticket_id']}",
+                    file=sys.stderr,
+                )
+
         except Exception as e:
-            print(f"[gmail_handler] ERROR in _fetch_and_normalise: {type(e).__name__}: {e}", file=sys.stderr)
-            return None
+            print(f"[gmail_handler] ERROR in _process_single_message: {type(e).__name__}: {e}", file=sys.stderr)
 
     # ------------------------------------------------------------------
     # Send reply
@@ -273,25 +287,18 @@ class GmailHandler:
 
     @staticmethod
     def _extract_email_address(from_header: str) -> str:
-        """Parse 'Display Name <email@example.com>' → 'email@example.com'."""
         if "<" in from_header and ">" in from_header:
             return from_header.split("<")[1].rstrip(">").strip()
         return from_header.strip()
 
     @staticmethod
     def _extract_display_name(from_header: str) -> str:
-        """Parse 'Display Name <email@example.com>' → 'Display Name'."""
         if "<" in from_header:
             return from_header.split("<")[0].strip().strip('"')
         return ""
 
     @staticmethod
     def _extract_body(payload_part: dict, snippet: str) -> str:
-        """Extract plain text body from Gmail message payload.
-
-        Tries text/plain MIME part first, falls back to snippet.
-        """
-        # Check if top-level part is text/plain
         mime_type = payload_part.get("mimeType", "")
         if mime_type == "text/plain":
             data = payload_part.get("body", {}).get("data", "")
@@ -301,7 +308,6 @@ class GmailHandler:
                 except Exception:
                     pass
 
-        # Walk multipart
         for part in payload_part.get("parts", []):
             if part.get("mimeType") == "text/plain":
                 data = part.get("body", {}).get("data", "")
@@ -311,5 +317,4 @@ class GmailHandler:
                     except Exception:
                         pass
 
-        # Fallback to snippet
         return snippet
