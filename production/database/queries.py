@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import asyncpg
 
@@ -882,6 +884,135 @@ async def upsert_knowledge_base(
 # ---------------------------------------------------------------------------
 # Metrics helper
 # ---------------------------------------------------------------------------
+
+
+async def get_sentiment_report(pool: asyncpg.Pool) -> dict[str, Any]:
+    """Return today's sentiment report keyed to PKT midnight.
+
+    Queries messages with non-NULL sentiment_score created today (PKT) and
+    returns counts, averages, escalation rate, worst tickets, channel split,
+    and a plain-language recommendation.
+    """
+    _PKT = ZoneInfo("Asia/Karachi")
+    now = datetime.now(_PKT)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    _empty = {
+        "date": now.strftime("%Y-%m-%d PKT"),
+        "total_tickets_today": 0,
+        "sentiment": {"positive": 0, "neutral": 0, "negative": 0, "avg_score": 0.0},
+        "escalation_rate_today": "0%",
+        "most_negative_tickets": [],
+        "channel_breakdown": {ch: {"total": 0, "avg_sentiment": 0.0} for ch in ("web_form", "whatsapp", "email")},
+        "recommendation": "No data available.",
+    }
+
+    try:
+        async with pool.acquire() as conn:
+            # Total tickets created today
+            total_today = int(await conn.fetchval(
+                "SELECT COUNT(*) FROM tickets WHERE created_at >= $1",
+                today_start,
+            ) or 0)
+
+            # Escalated tickets today
+            escalated_today = int(await conn.fetchval(
+                "SELECT COUNT(*) FROM tickets WHERE created_at >= $1 AND status = 'escalated'",
+                today_start,
+            ) or 0)
+            escalation_rate = round((escalated_today / total_today) * 100, 1) if total_today > 0 else 0.0
+
+            # Sentiment breakdown from customer messages scored today
+            sent_row = await conn.fetchrow(
+                "SELECT "
+                "  COUNT(*) FILTER (WHERE sentiment_score > 0.2)  AS positive, "
+                "  COUNT(*) FILTER (WHERE sentiment_score >= -0.2 AND sentiment_score <= 0.2) AS neutral, "
+                "  COUNT(*) FILTER (WHERE sentiment_score < -0.2) AS negative, "
+                "  AVG(sentiment_score) AS avg_score "
+                "FROM messages "
+                "WHERE created_at >= $1 "
+                "  AND role = 'customer' "
+                "  AND sentiment_score IS NOT NULL",
+                today_start,
+            )
+            positive  = int(sent_row["positive"]  or 0)
+            neutral   = int(sent_row["neutral"]   or 0)
+            negative  = int(sent_row["negative"]  or 0)
+            avg_score = round(float(sent_row["avg_score"] or 0.0), 2)
+
+            # Most negative tickets (by avg customer sentiment score, ascending)
+            neg_rows = await conn.fetch(
+                "SELECT t.id, t.subject, AVG(m.sentiment_score) AS avg_score "
+                "FROM tickets t "
+                "JOIN messages m ON m.conversation_id = t.conversation_id "
+                "WHERE t.created_at >= $1 "
+                "  AND m.role = 'customer' "
+                "  AND m.sentiment_score IS NOT NULL "
+                "GROUP BY t.id, t.subject "
+                "ORDER BY avg_score ASC "
+                "LIMIT 3",
+                today_start,
+            )
+            most_negative = [
+                {
+                    "ticket_id": "TKT-" + str(r["id"])[:8].upper(),
+                    "subject": r["subject"] or "(no subject)",
+                    "score": round(float(r["avg_score"]), 2),
+                }
+                for r in neg_rows
+            ]
+
+            # Channel breakdown with average sentiment
+            ch_rows = await conn.fetch(
+                "SELECT t.channel, COUNT(DISTINCT t.id) AS total, AVG(m.sentiment_score) AS avg_sentiment "
+                "FROM tickets t "
+                "JOIN messages m ON m.conversation_id = t.conversation_id "
+                "WHERE t.created_at >= $1 "
+                "  AND m.role = 'customer' "
+                "  AND m.sentiment_score IS NOT NULL "
+                "GROUP BY t.channel",
+                today_start,
+            )
+            channel_breakdown: dict[str, Any] = {
+                r["channel"]: {
+                    "total": int(r["total"]),
+                    "avg_sentiment": round(float(r["avg_sentiment"] or 0.0), 2),
+                }
+                for r in ch_rows
+            }
+            for ch in ("web_form", "whatsapp", "email"):
+                channel_breakdown.setdefault(ch, {"total": 0, "avg_sentiment": 0.0})
+
+            # Recommendation text
+            total_scored = positive + neutral + negative
+            if total_scored == 0:
+                recommendation = "No sentiment data for today yet."
+            elif total_scored > 0 and (negative / total_scored) > 0.3:
+                recommendation = "High negative sentiment detected. Review escalated tickets and consider proactive outreach."
+            elif escalation_rate > 20:
+                recommendation = "High escalation rate. Check agent workload and escalation thresholds."
+            elif total_scored > 0 and (positive / total_scored) > 0.6:
+                recommendation = "Low escalation rate. System performing well."
+            else:
+                recommendation = "Moderate sentiment. Monitor for emerging issues."
+
+            return {
+                "date": now.strftime("%Y-%m-%d PKT"),
+                "total_tickets_today": total_today,
+                "sentiment": {
+                    "positive": positive,
+                    "neutral": neutral,
+                    "negative": negative,
+                    "avg_score": avg_score,
+                },
+                "escalation_rate_today": f"{escalation_rate}%",
+                "most_negative_tickets": most_negative,
+                "channel_breakdown": channel_breakdown,
+                "recommendation": recommendation,
+            }
+    except Exception:
+        logger.exception("get_sentiment_report failed")
+        return _empty
 
 
 async def record_metric(

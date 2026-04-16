@@ -106,6 +106,14 @@ async def get_metrics_summary() -> JSONResponse:
 # ---------------------------------------------------------------------------
 
 
+@router.get("/metrics/sentiment-report")
+async def get_sentiment_report() -> JSONResponse:
+    """Return today's sentiment analysis report (PKT timezone)."""
+    pool = await _pool()
+    data = await queries.get_sentiment_report(pool)
+    return JSONResponse(data, status_code=200, headers={"Cache-Control": "no-store"})
+
+
 @router.get("/metrics/channels")
 async def get_metrics_channels() -> JSONResponse:
     """Return per-channel ticket metrics (email, whatsapp, web_form)."""

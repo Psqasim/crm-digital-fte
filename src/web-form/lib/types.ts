@@ -49,6 +49,30 @@ export interface MetricsSummary {
   recent_tickets: RecentTicket[];
 }
 
+export interface SentimentReport {
+  date: string
+  total_tickets_today: number
+  sentiment: {
+    positive: number
+    neutral: number
+    negative: number
+    avg_score: number
+  }
+  escalation_rate_today: string
+  most_negative_tickets: Array<{
+    ticket_id: string
+    subject: string
+    score: number
+  }>
+  channel_breakdown: {
+    [channel: string]: {
+      total: number
+      avg_sentiment: number
+    }
+  }
+  recommendation: string
+}
+
 export interface FormPayload {
   name: string;
   email: string;

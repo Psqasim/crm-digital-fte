@@ -8,17 +8,18 @@ import { z } from "zod"
 import { toast } from "sonner"
 import {
   AlertCircle, ArrowUpRight, CheckCircle2, Ticket,
-  UserPlus, Copy, CheckCheck,
+  UserPlus, Copy, CheckCheck, Activity,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import StatusBadge from "@/components/StatusBadge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import type { MetricsSummary, TicketStatus } from "@/lib/types"
+import type { MetricsSummary, SentimentReport, TicketStatus } from "@/lib/types"
 
 interface AdminDashboardContentProps {
   metrics: MetricsSummary | null
+  sentimentReport: SentimentReport | null
   user: { name: string; role: string }
 }
 
@@ -79,7 +80,127 @@ function CredentialsCard({ user, onDone }: { user: CreatedUser; onDone: () => vo
   )
 }
 
-export default function AdminDashboardContent({ metrics, user }: AdminDashboardContentProps) {
+function SentimentWidget({ report }: { report: SentimentReport }) {
+  const { sentiment, escalation_rate_today, recommendation, most_negative_tickets, channel_breakdown, total_tickets_today, date } = report
+
+  const totalScored = sentiment.positive + sentiment.neutral + sentiment.negative
+  const pct = (n: number) => totalScored > 0 ? Math.round((n / totalScored) * 100) : 0
+  const positivePct = pct(sentiment.positive)
+  const neutralPct  = pct(sentiment.neutral)
+  const negativePct = pct(sentiment.negative)
+
+  const escalationNum = parseFloat(escalation_rate_today)
+
+  // Color theme
+  const theme: "green" | "yellow" | "red" =
+    negativePct > 30 || escalationNum > 20 ? "red"
+    : positivePct > 60 ? "green"
+    : "yellow"
+
+  const tc = {
+    green:  { border: "border-green-500/30",  bg: "bg-green-500/10",  title: "text-green-400",  dot: "bg-green-400"  },
+    yellow: { border: "border-yellow-500/30", bg: "bg-yellow-500/10", title: "text-yellow-400", dot: "bg-yellow-400" },
+    red:    { border: "border-red-500/30",    bg: "bg-red-500/10",    title: "text-red-400",    dot: "bg-red-400"    },
+  }[theme]
+
+  const channelLabel: Record<string, string> = { web_form: "Web", whatsapp: "WhatsApp", email: "Email" }
+
+  return (
+    <div className={`rounded-xl border ${tc.border} ${tc.bg} p-5 space-y-4`}>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${tc.dot}`} />
+          <h3 className={`font-semibold text-sm ${tc.title}`}>Today&apos;s Sentiment</h3>
+        </div>
+        <span className="text-slate-500 text-xs">{date}</span>
+      </div>
+
+      {/* Sentiment bars */}
+      <div className="space-y-2">
+        {[
+          { label: "Positive", pct: positivePct, color: "bg-green-500", textColor: "text-green-400" },
+          { label: "Neutral",  pct: neutralPct,  color: "bg-yellow-500", textColor: "text-yellow-400" },
+          { label: "Negative", pct: negativePct, color: "bg-red-500",   textColor: "text-red-400" },
+        ].map(({ label, pct: p, color, textColor }) => (
+          <div key={label} className="flex items-center gap-3">
+            <span className="text-xs text-slate-400 w-14 shrink-0">{label}</span>
+            <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+              <div className={`h-2 ${color} rounded-full transition-all duration-500`} style={{ width: `${p}%` }} />
+            </div>
+            <span className={`text-xs font-medium ${textColor} w-8 text-right shrink-0`}>{p}%</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-slate-800/70 rounded-lg p-3 text-center">
+          <p className="text-xl font-bold text-white">{total_tickets_today}</p>
+          <p className="text-xs text-slate-500 mt-0.5">tickets today</p>
+        </div>
+        <div className="bg-slate-800/70 rounded-lg p-3 text-center">
+          <p className={`text-xl font-bold ${sentiment.avg_score > 0.1 ? "text-green-400" : sentiment.avg_score < -0.1 ? "text-red-400" : "text-yellow-400"}`}>
+            {sentiment.avg_score > 0 ? "+" : ""}{sentiment.avg_score.toFixed(2)}
+          </p>
+          <p className="text-xs text-slate-500 mt-0.5">avg score</p>
+        </div>
+        <div className={`rounded-lg p-3 text-center ${escalationNum > 20 ? "bg-red-500/20" : "bg-slate-800/70"}`}>
+          <p className={`text-xl font-bold ${escalationNum > 20 ? "text-red-400" : escalationNum > 10 ? "text-yellow-400" : "text-white"}`}>
+            {escalation_rate_today}
+          </p>
+          <p className="text-xs text-slate-500 mt-0.5">escalation</p>
+        </div>
+      </div>
+
+      {/* Recommendation */}
+      <div className={`rounded-lg px-3 py-2 ${theme === "red" ? "bg-red-500/10" : theme === "green" ? "bg-green-500/10" : "bg-yellow-500/10"}`}>
+        <p className="text-xs text-slate-300 leading-relaxed">{recommendation}</p>
+      </div>
+
+      {/* Most negative tickets */}
+      {most_negative_tickets.length > 0 && (
+        <div>
+          <p className="text-xs text-slate-500 font-medium mb-2">Most negative tickets</p>
+          <div className="space-y-1.5">
+            {most_negative_tickets.map((t) => (
+              <div key={t.ticket_id} className="flex items-center justify-between text-xs bg-slate-800/60 rounded-lg px-3 py-1.5">
+                <Link href={`/ticket/${t.ticket_id}`} className="font-mono text-[#3B82F6] hover:text-[#60A5FA] shrink-0">
+                  {t.ticket_id}
+                </Link>
+                <span className="text-slate-400 truncate mx-3 flex-1">{t.subject}</span>
+                <span className="text-red-400 font-medium shrink-0">{t.score.toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Channel breakdown */}
+      <div>
+        <p className="text-xs text-slate-500 font-medium mb-2">Channel sentiment</p>
+        <div className="grid grid-cols-3 gap-2">
+          {(["web_form", "whatsapp", "email"] as const).map((ch) => {
+            const data = channel_breakdown[ch] ?? { total: 0, avg_sentiment: 0.0 }
+            const s = data.avg_sentiment
+            const sentColor = s > 0.1 ? "text-green-400" : s < -0.1 ? "text-red-400" : "text-yellow-400"
+            return (
+              <div key={ch} className="bg-slate-800/70 rounded-lg p-2.5 text-center">
+                <p className="text-xs text-slate-400 mb-1">{channelLabel[ch]}</p>
+                <p className={`text-sm font-semibold ${sentColor}`}>
+                  {s > 0 ? "+" : ""}{s.toFixed(2)}
+                </p>
+                <p className="text-xs text-slate-600 mt-0.5">{data.total} tickets</p>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function AdminDashboardContent({ metrics, sentimentReport, user }: AdminDashboardContentProps) {
   const [formError, setFormError] = useState<string | null>(null)
   const [createdUser, setCreatedUser] = useState<CreatedUser | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -144,6 +265,17 @@ export default function AdminDashboardContent({ metrics, user }: AdminDashboardC
                 </CardContent>
               </Card>
             ))}
+          </div>
+        )}
+
+        {/* Today's Sentiment Widget */}
+        {sentimentReport && (
+          <div>
+            <h2 className="text-lg font-semibold text-slate-200 mb-3 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-[#3B82F6]" />
+              Today&apos;s Sentiment
+            </h2>
+            <SentimentWidget report={sentimentReport} />
           </div>
         )}
 

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { auth } from "@/auth"
-import type { MetricsSummary } from "@/lib/types"
+import type { MetricsSummary, SentimentReport } from "@/lib/types"
 import AdminDashboardContent from "./AdminDashboardContent"
 
 export const metadata = {
@@ -15,12 +15,25 @@ export default async function AdminDashboardPage() {
   }
 
   const fastapiUrl = process.env.FASTAPI_URL ?? "http://localhost:8000"
+
   let metrics: MetricsSummary | null = null
-  try {
-    const res = await fetch(`${fastapiUrl}/metrics/summary`, { cache: "no-store" })
-    if (res.ok) metrics = await res.json()
-  } catch {
+  let sentimentReport: SentimentReport | null = null
+
+  const [metricsRes, sentimentRes] = await Promise.allSettled([
+    fetch(`${fastapiUrl}/metrics/summary`, { cache: "no-store" }),
+    fetch(`${fastapiUrl}/metrics/sentiment-report`, { cache: "no-store" }),
+  ])
+
+  if (metricsRes.status === "fulfilled" && metricsRes.value.ok) {
+    metrics = await metricsRes.value.json()
+  } else {
     console.error("Failed to fetch metrics from FastAPI")
+  }
+
+  if (sentimentRes.status === "fulfilled" && sentimentRes.value.ok) {
+    sentimentReport = await sentimentRes.value.json()
+  } else {
+    console.error("Failed to fetch sentiment report from FastAPI")
   }
 
   return (
@@ -35,7 +48,11 @@ export default async function AdminDashboardPage() {
             </p>
           </div>
         </div>
-        <AdminDashboardContent metrics={metrics} user={{ name: session.user.name ?? "", role: session.user.role }} />
+        <AdminDashboardContent
+          metrics={metrics}
+          sentimentReport={sentimentReport}
+          user={{ name: session.user.name ?? "", role: session.user.role }}
+        />
       </div>
     </main>
   )
