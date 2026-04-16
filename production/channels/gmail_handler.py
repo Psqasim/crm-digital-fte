@@ -165,8 +165,15 @@ class GmailHandler:
 
             for entry in history_entries:
                 for msg_stub in entry.get("messagesAdded", []):
-                    msg_id = msg_stub.get("message", {}).get("id", "")
+                    msg_stub_data = msg_stub.get("message", {})
+                    msg_id = msg_stub_data.get("id", "")
                     if not msg_id:
+                        continue
+
+                    # Only process messages in INBOX — skip SENT, DRAFTS, etc.
+                    msg_labels = msg_stub_data.get("labelIds", [])
+                    if msg_labels and "INBOX" not in msg_labels:
+                        print(f"[gmail_handler] skipping non-INBOX message {msg_id} labels={msg_labels}", file=sys.stderr)
                         continue
 
                     # DB-level dedup
@@ -195,6 +202,12 @@ class GmailHandler:
             thread_id = msg.get("threadId", "")
             payload_part = msg.get("payload", {})
             headers = payload_part.get("headers", [])
+
+            # Skip if not in INBOX (e.g. our own sent reply triggered a notification)
+            label_ids = msg.get("labelIds", [])
+            if label_ids and "INBOX" not in label_ids:
+                print(f"[gmail_handler] skipping non-INBOX message {msg_id} labels={label_ids}", file=sys.stderr)
+                return
 
             from_header = next((h["value"] for h in headers if h["name"] == "From"), "")
             subject = next((h["value"] for h in headers if h["name"] == "Subject"), "(no subject)")
