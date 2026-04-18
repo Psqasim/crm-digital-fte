@@ -135,6 +135,7 @@ Full setup instructions → [docs/setup/setup.md](docs/setup/setup.md)
 | **Frontend** | https://crm-digital-fte-two.vercel.app |
 | **Backend API** | https://psqasim-crm-digital-fte-api.hf.space |
 | **Health check** | https://psqasim-crm-digital-fte-api.hf.space/health |
+| **Video Demo** | https://www.youtube.com/watch?v=5Jk2zpKcOYU |
 
 ### Test Credentials
 ```
@@ -185,7 +186,20 @@ crm-digital-fte/
 
 ## Screenshots
 
-> _Add screenshots here — web form, ticket status page, agent response._
+| | |
+|---|---|
+| ![Landing Page](public/screenshots/landing.png) | ![Support Form](public/screenshots/support-form.png) |
+| Landing Page | Support Form |
+| ![Ticket Submitted](public/screenshots/ticket-submitted.png) | ![Ticket Open](public/screenshots/ticket-status-open.png) |
+| Ticket Submitted — TKT ID | AI Analyzing Ticket |
+| ![Ticket Resolved](public/screenshots/ticket-status-resolved..png) | ![Admin Dashboard](public/screenshots/admin-dashboard.png) |
+| AI Resolved — No Human | Admin Dashboard |
+| ![My Tickets](public/screenshots/my-tickets.png) | ![Chat Widget](public/screenshots/chat-widget-open.png) |
+| My Tickets Dashboard | AI Chat Widget |
+| ![WhatsApp Proof](public/screenshots/whatsapp-proof.png) | ![Gmail Proof](public/screenshots/gmail-proof.png) |
+| WhatsApp Channel — Live | Gmail Channel — Live |
+| ![HF Health](public/screenshots/hf-health.png) | |
+| Backend Health Check | |
 
 ---
 

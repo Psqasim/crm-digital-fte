@@ -117,3 +117,8 @@ dmypy.json
 gmail-authorized.json
 gmail-client-secret.json
 gmail_oauth.py
+
+# Personal demo/recording working files — never commit
+DEMO_SCRIPT.md
+VOICEOVER_SCRIPT.md
+linkedin-caption.md
